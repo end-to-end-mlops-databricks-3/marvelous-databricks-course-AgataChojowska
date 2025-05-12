@@ -1,0 +1,9 @@
+prd:
+  catalog_name: mlops_prd
+  schema_name: chojowsk
+acc:
+  catalog_name: mlops_acc
+  schema_name: chojowsk
+dev:
+  catalog_name: mlops_dev
+  schema_name: chojowsk
