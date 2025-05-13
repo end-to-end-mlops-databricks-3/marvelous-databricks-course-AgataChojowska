@@ -35,7 +35,7 @@ jobs:
 
       - name: Run pre-commit checks
         run: |
-          uv run pre-commit run --all-files
+          uv run pre-commit run --all-files --hook-stage manual
 
       - name: run pytest
         run: |
