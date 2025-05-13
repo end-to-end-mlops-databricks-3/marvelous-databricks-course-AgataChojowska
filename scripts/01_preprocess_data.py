@@ -1,45 +1,51 @@
-import argparse
+"""Tennis match data processing pipeline."""
 
 import yaml
 from loguru import logger
-from pyspark.sql import SparkSession
-from databricks.connect import DatabricksSession
-
-from tennis.config import ProjectConfig
-#from house_price.data_processor import DataProcessor, generate_synthetic_data
-from marvelous.logging import setup_logging
 from marvelous.timer import Timer
 
-config_path = f"project_config.yml"
-
-config = ProjectConfig.from_yaml(config_path=config_path, env="dev")
-
-setup_logging(log_file=f"/Volumes/{config.catalog_name}/{config.schema_name}/logs/marvelous-1.log")
-
-logger.info("Configuration loaded:")
-logger.info(yaml.dump(config, default_flow_style=False))
+from tennis.catalog_utils import save_to_catalog
+from tennis.config import ProjectConfig
+from tennis.data_processor import DataProcessor
+from tennis.runtime_utils import setup_project_logging
 
 
-# Load the house prices dataset
-spark = SparkSession.builder.getOrCreate()
-#spark = DatabricksSession.builder.clusterId("0510-190453-zo6szr4b").getOrCreate()
+def main() -> None:
+    """Execute the data processing pipeline."""
+    config_path = "project_config.yml"
 
-# df = spark.read.csv(
-#     f"/Volumes/{config.catalog_name}/{config.schema_name}/atp_matches/*.csv", header=True, inferSchema=True
-# ).toPandas()
+    # Load configuration
+    config = ProjectConfig.from_yaml(config_path=config_path, env="dev")
 
-# Preprocess the data
-# with Timer() as preprocess_timer:
-#     data_processor = DataProcessor(df, config, spark)
-#     data_processor.preprocess()
+    # Set up logging with configuration
+    setup_project_logging(config)
 
-# logger.info(f"Data preprocessing: {preprocess_timer}")
+    logger.info("Configuration loaded:")
+    logger.info(yaml.dump(config, default_flow_style=False))
 
-# # Split the data
-# X_train, X_test = data_processor.split_data()
-# logger.info("Training set shape: %s", X_train.shape)
-# logger.info("Test set shape: %s", X_test.shape)
+    # Preprocess the data
+    with Timer() as preprocess_timer:
+        data_processor = DataProcessor(config)
+        processed_data = data_processor.process_data()
 
-# # Save to catalog
-# logger.info("Saving data to catalog")
-# data_processor.save_to_catalog(X_train, X_test)
+        logger.info(f"Processed Data Shape: {processed_data.shape}")
+        logger.info(f"Columns: {processed_data.columns.tolist()}")
+        logger.info("First few rows:")
+        logger.info(f"\n{processed_data.head()}")
+
+    logger.info(f"Data preprocessing completed in: {preprocess_timer}")
+
+    # Split the data
+    X_train, X_test = data_processor.split_data(processed_data)
+    logger.info("Training set shape: %s", X_train.shape)
+    logger.info("Test set shape: %s", X_test.shape)
+
+    # Save to catalog
+    logger.info("Saving data to catalog")
+    datasets = {"train_set": X_train, "test_set": X_test}
+    for table_name, dataset in datasets.items():
+        save_to_catalog(dataset=dataset, config=config, table_name=table_name)
+
+
+if __name__ == "__main__":
+    main()

@@ -7,3 +7,81 @@ acc:
 dev:
   catalog_name: mlops_dev
   schema_name: chojowsk
+
+processing:
+  start_year: 1992
+  end_year: 1993
+
+columns:
+  winner:
+    - winner_id
+    - winner_seed
+    - winner_entry
+    - winner_name
+    - winner_hand
+    - winner_ht
+    - winner_ioc
+    - winner_age
+    - w_ace
+    - w_df
+    - w_svpt
+    - w_1stIn
+    - w_1stWon
+    - w_2ndWon
+    - w_SvGms
+    - w_bpSaved
+    - w_bpFaced
+    - winner_rank
+    - winner_rank_points
+
+  loser:
+    - loser_id
+    - loser_seed
+    - loser_entry
+    - loser_name
+    - loser_hand
+    - loser_ht
+    - loser_ioc
+    - loser_age
+    - l_ace
+    - l_df
+    - l_svpt
+    - l_1stIn
+    - l_1stWon
+    - l_2ndWon
+    - l_SvGms
+    - l_bpSaved
+    - l_bpFaced
+    - loser_rank
+    - loser_rank_points
+
+  required:
+    - winner_id
+    - loser_id
+    - winner_ht
+    - loser_ht
+    - winner_age
+    - loser_age
+    - w_ace
+    - w_df
+    - w_svpt
+    - w_1stIn
+    - w_1stWon
+    - w_2ndWon
+    - w_SvGms
+    - w_bpSaved
+    - w_bpFaced
+    - l_ace
+    - l_df
+    - l_svpt
+    - l_1stIn
+    - l_1stWon
+    - l_2ndWon
+    - l_SvGms
+    - l_bpSaved
+    - l_bpFaced
+    - winner_rank_points
+    - loser_rank_points
+    - winner_rank
+    - loser_rank
+    - surface

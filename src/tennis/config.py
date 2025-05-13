@@ -1,24 +1,31 @@
 """Configuration file for the project."""
 
-from typing import Any
-
 import yaml
 from pydantic import BaseModel
 
 
+class ColumnsConfig(BaseModel):
+    """Column configurations."""
+
+    winner: list[str]
+    loser: list[str]
+    required: list[str]
+
+
+class DataProcessingConfig(BaseModel):
+    """Data processing configurations."""
+
+    start_year: int = 1992
+    end_year: int = 2025
+
+
 class ProjectConfig(BaseModel):
-    """Represent project configuration parameters loaded from YAML.
+    """Represent project configuration parameters loaded from YAML."""
 
-    Handles feature specifications, catalog details, and experiment parameters.
-    Supports environment-specific configuration overrides.
-    """
-
-    #num_features: list[str]
-    #cat_features: list[str]
-    #target: str
     catalog_name: str
     schema_name: str
-    #parameters: dict[str, Any]
+    processing: DataProcessingConfig
+    columns: ColumnsConfig
 
     @classmethod
     def from_yaml(cls, config_path: str, env: str = "dev") -> "ProjectConfig":
@@ -33,8 +40,14 @@ class ProjectConfig(BaseModel):
 
         with open(config_path) as f:
             config_dict = yaml.safe_load(f)
+
+            # Extract environment-specific settings
             config_dict["catalog_name"] = config_dict[env]["catalog_name"]
             config_dict["schema_name"] = config_dict[env]["schema_name"]
+
+            # Remove environment sections from dict before creating config
+            for env_key in ["prd", "acc", "dev"]:
+                config_dict.pop(env_key, None)
 
             return cls(**config_dict)
 
