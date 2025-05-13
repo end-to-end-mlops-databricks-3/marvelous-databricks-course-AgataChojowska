@@ -1,4 +1,4 @@
-"""Unity Catalog utilities for saving datasets to Databricks."""
+"""Unity Catalog utilities for saving datasets to Databricks tables."""
 
 import pandas as pd
 from loguru import logger
