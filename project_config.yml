@@ -1,12 +1,15 @@
 prd:
   catalog_name: mlops_prd
   schema_name: chojowsk
+  file_path: atp_matches/atp_matches_*.csv
 acc:
   catalog_name: mlops_acc
   schema_name: chojowsk
+  file_path: atp_matches/atp_matches_*.csv
 dev:
   catalog_name: mlops_dev
   schema_name: chojowsk
+  file_path: atp_matches/atp_matches_*.csv
 
 processing:
   start_year: 1992

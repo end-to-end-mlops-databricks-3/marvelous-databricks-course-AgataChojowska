@@ -7,7 +7,7 @@ from marvelous.timer import Timer
 from tennis.catalog_utils import save_to_catalog
 from tennis.config import ProjectConfig
 from tennis.data_processor import DataProcessor
-from tennis.runtime_utils import setup_project_logging
+from tennis.runtime_utils import get_spark, setup_project_logging
 
 
 def main() -> None:
@@ -25,7 +25,7 @@ def main() -> None:
 
     # Preprocess the data
     with Timer() as preprocess_timer:
-        data_processor = DataProcessor(config)
+        data_processor = DataProcessor(config=config, spark=get_spark())
         processed_data = data_processor.process_data()
 
         logger.info(f"Processed Data Shape: {processed_data.shape}")

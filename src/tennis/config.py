@@ -24,6 +24,7 @@ class ProjectConfig(BaseModel):
 
     catalog_name: str
     schema_name: str
+    file_path: str
     processing: DataProcessingConfig
     columns: ColumnsConfig
 
@@ -44,6 +45,7 @@ class ProjectConfig(BaseModel):
             # Extract environment-specific settings
             config_dict["catalog_name"] = config_dict[env]["catalog_name"]
             config_dict["schema_name"] = config_dict[env]["schema_name"]
+            config_dict["file_path"] = config_dict[env]["file_path"]
 
             # Remove environment sections from dict before creating config
             for env_key in ["prd", "acc", "dev"]:

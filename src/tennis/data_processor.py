@@ -3,10 +3,10 @@
 import numpy as np
 import pandas as pd
 from loguru import logger
+from pyspark.sql import SparkSession
 from sklearn.model_selection import train_test_split
 
 from tennis.config import ProjectConfig
-from tennis.runtime_utils import get_spark
 
 
 class DataProcessor:
@@ -17,9 +17,9 @@ class DataProcessor:
 
     """
 
-    def __init__(self, config: ProjectConfig) -> None:
+    def __init__(self, config: ProjectConfig, spark: SparkSession) -> None:
         self.config = config
-        self.spark = get_spark()
+        self.spark = spark
 
     def load_data(self) -> pd.DataFrame:
         """Load match data from CSV files in Unity Catalog.
@@ -32,9 +32,8 @@ class DataProcessor:
             DataFrame containing all match data from specified years.
 
         """
-        base_path = f"/Volumes/{self.config.catalog_name}/{self.config.schema_name}/atp_matches"
+        file_pattern = f"/Volumes/{self.config.catalog_name}/{self.config.schema_name}/{self.config.file_path}"
 
-        file_pattern = f"{base_path}/atp_matches_*.csv"
         df_spark = self.spark.read.csv(file_pattern, header=True, inferSchema=True)
 
         df_pandas = df_spark.toPandas()
