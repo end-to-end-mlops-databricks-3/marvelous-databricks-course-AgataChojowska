@@ -4,7 +4,7 @@ import yaml
 from loguru import logger
 from marvelous.timer import Timer
 
-from tennis.catalog_utils import save_to_catalog
+from tennis.catalog_utils import load_csv, save_to_catalog
 from tennis.config import ProjectConfig
 from tennis.data_processor import DataProcessor
 from tennis.runtime_utils import get_spark, setup_project_logging
@@ -23,9 +23,13 @@ def main() -> None:
     logger.info("Configuration loaded:")
     logger.info(yaml.dump(config, default_flow_style=False))
 
+    # Get SparkSession or Databricks session based on your current runtime.
+    spark = get_spark()
+
     # Preprocess the data
     with Timer() as preprocess_timer:
-        data_processor = DataProcessor(config=config, spark=get_spark())
+        raw_data = load_csv(config=config, spark=spark)
+        data_processor = DataProcessor(raw_data=raw_data, config=config)
         processed_data = data_processor.process_data()
 
         logger.info(f"Processed Data Shape: {processed_data.shape}")
@@ -44,7 +48,7 @@ def main() -> None:
     logger.info("Saving data to catalog")
     datasets = {"train_set": X_train, "test_set": X_test}
     for table_name, dataset in datasets.items():
-        save_to_catalog(dataset=dataset, config=config, table_name=table_name)
+        save_to_catalog(dataset=dataset, config=config, spark=spark, table_name=table_name)
 
 
 if __name__ == "__main__":

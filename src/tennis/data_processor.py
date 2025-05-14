@@ -3,7 +3,6 @@
 import numpy as np
 import pandas as pd
 from loguru import logger
-from pyspark.sql import SparkSession
 from sklearn.model_selection import train_test_split
 
 from tennis.config import ProjectConfig
@@ -17,33 +16,17 @@ class DataProcessor:
 
     """
 
-    def __init__(self, config: ProjectConfig, spark: SparkSession) -> None:
+    def __init__(self, raw_data: pd.DataFrame, config: ProjectConfig) -> None:
+        self.raw_data = raw_data
         self.config = config
-        self.spark = spark
 
-    def load_data(self) -> pd.DataFrame:
-        """Load match data from CSV files in Unity Catalog.
-
-        Args:
-            start_year: First year of data to load. Defaults to 1992.
-            end_year: Last year of data to load (exclusive). Defaults to 2024.
-
-        Returns:
-            DataFrame containing all match data from specified years.
-
-        """
-        file_pattern = f"/Volumes/{self.config.catalog_name}/{self.config.schema_name}/{self.config.file_path}"
-
-        df_spark = self.spark.read.csv(file_pattern, header=True, inferSchema=True)
-
-        df_pandas = df_spark.toPandas()
-
-        df_pandas["year"] = df_pandas["tourney_date"].astype(str).str[:4].astype(int)
-        df_filtered = df_pandas[
-            (df_pandas["year"] >= self.config.processing.start_year)
-            & (df_pandas["year"] < self.config.processing.end_year)
+    def filter_data(self) -> pd.DataFrame:
+        """Filter data to create a dataFrame containing all match data from specified years."""
+        self.raw_data["year"] = self.raw_data["tourney_date"].astype(str).str[:4].astype(int)
+        df_filtered = self.raw_data[
+            (self.raw_data["year"] >= self.config.processing.start_year)
+            & (self.raw_data["year"] < self.config.processing.end_year)
         ]
-
         return df_filtered
 
     def clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -93,7 +76,7 @@ class DataProcessor:
         logger.info(
             f"Loading ATP match data from {self.config.processing.start_year} to {self.config.processing.end_year}..."
         )
-        df = self.load_data()
+        df = self.filter_data()
         logger.info(f"Loaded {len(df)} matches")
 
         logger.info("Cleaning data...")
@@ -103,6 +86,7 @@ class DataProcessor:
         logger.info("Randomizing player assignments...")
         df_processed = self.randomize_players(df_cleaned)
         logger.info(f"Final dataset: {len(df_processed)} matches")
+        logger.info(df_processed.columns)
 
         return df_processed
 
