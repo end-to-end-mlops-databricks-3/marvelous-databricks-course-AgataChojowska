@@ -9,10 +9,21 @@ acc:
 dev:
   catalog_name: mlops_dev
   schema_name: chojowsk
-  file_path: atp_matches/atp_matches_*.csv
+  file_path: atp_matches/atp_matches_2022.csv
+
+experiment_name_custom: /Shared/tennis-custom
+
+parameters:
+  colsample_bytree: 0.6
+  learning_rate: 0.05
+  max_depth: 5
+  n_estimators: 100
+  reg_alpha: 0.5
+  reg_lambda: 0.5
+  subsample: 0.7
 
 processing:
-  start_year: 1968
+  start_year: 2022
   end_year: 2024
 
 columns:
@@ -88,3 +99,7 @@ columns:
     - winner_rank
     - loser_rank
     - surface
+
+tables:
+  train: train_set
+  test: test_set

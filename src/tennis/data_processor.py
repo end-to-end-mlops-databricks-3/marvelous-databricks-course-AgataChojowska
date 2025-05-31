@@ -57,7 +57,15 @@ class DataProcessor:
         # Create RESULT column (1 = not swapped, 0 = swapped)
         df_randomized["RESULT"] = np.where(mask, 0, 1)
 
-        # Swap values where mask is True
+        # Convert columns to object dtype to allow mixed types
+        player1_cols_obj = [col for col in player1_cols]
+        player2_cols_obj = [col for col in player2_cols]
+
+        for col1, col2 in zip(player1_cols_obj, player2_cols_obj):
+            df_randomized[col1] = df_randomized[col1].astype("object")
+            df_randomized[col2] = df_randomized[col2].astype("object")
+
+        # Now perform the swap
         df_randomized.loc[mask, player1_cols], df_randomized.loc[mask, player2_cols] = (
             df_randomized.loc[mask, player2_cols].values,
             df_randomized.loc[mask, player1_cols].values,
@@ -66,13 +74,7 @@ class DataProcessor:
         return df_randomized
 
     def process_data(self) -> pd.DataFrame:
-        """Execute full data processing pipeline.
-
-        Args:
-            start_year: First year of data to process. Defaults to 1992.
-            end_year: Last year of data to process (exclusive). Defaults to 2024.
-
-        """
+        """Execute full data processing pipeline."""
         logger.info(
             f"Loading ATP match data from {self.config.processing.start_year} to {self.config.processing.end_year}..."
         )
@@ -91,13 +93,17 @@ class DataProcessor:
         return df_processed
 
     def split_data(
-        self, df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42
-    ) -> tuple[pd.DataFrame, pd.DataFrame]:
+        self, df: pd.DataFrame, target_name: str, test_size: float = 0.2, random_state: int = 42
+    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """Split the DataFrame (self.df) into training and test sets.
 
         :param test_size: The proportion of the dataset to include in the test split.
         :param random_state: Controls the shuffling applied to the data before applying the split.
         :return: A tuple containing the training and test DataFrames.
         """
-        train_set, test_set = train_test_split(df, test_size=test_size, random_state=random_state)
-        return train_set, test_set
+        X = df.drop(target_name, axis=1)  # Features only
+        y = df[target_name]
+
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+        return X_train, X_test, y_train, y_test

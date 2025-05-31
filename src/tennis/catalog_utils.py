@@ -41,3 +41,42 @@ def load_csv(config: ProjectConfig, spark: SparkSession, header: bool = True, in
     file_pattern = f"/Volumes/{config.catalog_name}/{config.schema_name}/{config.file_path}"
     df_spark = spark.read.csv(file_pattern, header=header, inferSchema=inferSchema)
     return df_spark.toPandas()
+
+
+def load_from_table_to_pandas(
+    spark: SparkSession, config: ProjectConfig, table: str, limit: int | None = None
+) -> pd.DataFrame:
+    """Load data from Databricks tables to pandas Dataframe."""
+    dataset_spark = spark.table(f"{config.catalog_name}.{config.schema_name}.{table}")  # TODO try with limit as query
+    if limit:
+        dataset_spark = dataset_spark.limit(limit)
+    dataset = dataset_spark.toPandas()
+    data_version = "0"  # describe history -> retrieve
+    logger.info(f"✅ Data from table {table}, schema {config.schema_name} successfully loaded.")
+    return dataset
+
+
+def load_from_table_to_spark(
+    spark: SparkSession, config: ProjectConfig, table: str, limit: int | None = None
+) -> pd.DataFrame:
+    """Load data from Databricks tables to spark Dataframe."""
+    dataset_spark = spark.table(f"{config.catalog_name}.{config.schema_name}.{table}")
+    if limit:
+        dataset_spark = dataset_spark.limit(limit)
+    data_version = "0"  # describe history -> retrieve
+    logger.info(f"✅ Data from table {table}, schema {config.schema_name} successfully loaded.")
+    return dataset_spark
+
+
+def load_sample_data_to_pandas(
+    spark: SparkSession, config: ProjectConfig, table: str, limit: int = 100
+) -> pd.DataFrame:
+    """Load sample data from Databricks tables to pandas Dataframe."""
+    query = f"""
+    SELECT * FROM {config.catalog_name}.{config.schema_name}.{table}
+    LIMIT {limit}
+    """
+    dataset_spark = spark.sql(query)
+    dataset = dataset_spark.toPandas()
+    logger.info(f"✅ Sample data loaded ({len(dataset)} rows from {table}).")
+    return dataset

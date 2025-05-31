@@ -1,5 +1,7 @@
 """Configuration file for the project."""
 
+from typing import Any
+
 import yaml
 from pydantic import BaseModel
 
@@ -19,6 +21,13 @@ class DataProcessingConfig(BaseModel):
     end_year: int = 2025
 
 
+class Tables(BaseModel):
+    """Tables configurations."""
+
+    train: str
+    test: str
+
+
 class ProjectConfig(BaseModel):
     """Represent project configuration parameters loaded from YAML."""
 
@@ -27,6 +36,9 @@ class ProjectConfig(BaseModel):
     file_path: str
     processing: DataProcessingConfig
     columns: ColumnsConfig
+    tables: Tables
+    experiment_name_custom: str | None
+    parameters: dict[str, Any]
 
     @classmethod
     def from_yaml(cls, config_path: str, env: str = "dev") -> "ProjectConfig":
