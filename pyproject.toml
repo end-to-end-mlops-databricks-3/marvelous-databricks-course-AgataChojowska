@@ -25,9 +25,6 @@ dependencies = [
 
 dynamic = ['version']
 
-[tool.uv.sources]
-marvelous = {git = "https://github.com/end-to-end-mlops-databricks-3/marvelous.git"}
-
 [project.optional-dependencies]
 dev = ["databricks-connect==15.4.5",
        "ipykernel>=6.29.5, <7",
