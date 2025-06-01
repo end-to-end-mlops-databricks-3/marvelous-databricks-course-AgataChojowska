@@ -92,18 +92,19 @@ class DataProcessor:
 
         return df_processed
 
-    def split_data(
-        self, df: pd.DataFrame, target_name: str, test_size: float = 0.2, random_state: int = 42
-    ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
-        """Split the DataFrame (self.df) into training and test sets.
 
-        :param test_size: The proportion of the dataset to include in the test split.
-        :param random_state: Controls the shuffling applied to the data before applying the split.
-        :return: A tuple containing the training and test DataFrames.
-        """
-        X = df.drop(target_name, axis=1)  # Features only
-        y = df[target_name]
+def split_data(
+    df: pd.DataFrame, config: ProjectConfig, test_size: float = 0.2, random_state: int = 42
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """Split the DataFrame (self.df) into training and test sets.
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+    :param test_size: The proportion of the dataset to include in the test split.
+    :param random_state: Controls the shuffling applied to the data before applying the split.
+    :return: A tuple containing the training and test DataFrames.
+    """
+    X = df.drop(config.target_name, axis=1)  # Features only
+    y = df[config.target_name]
 
-        return X_train, X_test, y_train, y_test
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
+
+    return X_train, X_test, y_train, y_test

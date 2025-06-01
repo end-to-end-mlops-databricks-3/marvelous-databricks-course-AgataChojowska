@@ -39,6 +39,7 @@ class ProjectConfig(BaseModel):
     tables: Tables
     experiment_name_custom: str | None
     parameters: dict[str, Any]
+    target_name: str
 
     @classmethod
     def from_yaml(cls, config_path: str, env: str = "dev") -> "ProjectConfig":

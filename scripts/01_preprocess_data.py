@@ -6,8 +6,8 @@ from marvelous.timer import Timer
 
 from tennis.catalog_utils import load_csv, save_to_catalog
 from tennis.config import ProjectConfig
-from tennis.data_processor import DataProcessor
-from tennis.runtime_utils import get_spark, setup_project_logger
+from tennis.data_processor import DataProcessor, split_data
+from tennis.runtime_utils import get_spark, setup_project_logging
 from tennis.stats_calculator import StatsCalculator
 
 
@@ -19,7 +19,7 @@ def main() -> None:
     config = ProjectConfig.from_yaml(config_path=config_path, env="dev")
 
     # Set up logger with configuration
-    setup_project_logger(config)
+    setup_project_logging(config)
 
     logger.info("Configuration loaded:")
     logger.info(yaml.dump(config, default_flow_style=False))
@@ -45,11 +45,12 @@ def main() -> None:
         logger.info(f"Processed Stats Data Shape: {stats_data.shape}")
         logger.info("First few rows:")
         logger.info(f"\n{stats_data.head()}")
+        stats_data.to_csv("stats_data.csv")
 
     logger.info(f"Data preprocessing completed in: {preprocess_timer}")
 
     # Split the data
-    X_train, X_test, y_train, y_test = data_processor.split_data(df=stats_data, target_name="RESULT")
+    X_train, X_test, y_train, y_test = split_data(df=stats_data, config=config)
     logger.info("Training set shape: %s", X_train.shape)
     logger.info("Test set shape: %s", X_test.shape)
     logger.info("Target train shape: %s", y_train.shape)

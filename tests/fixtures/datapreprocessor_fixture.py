@@ -65,6 +65,24 @@ def sample_data(config: ProjectConfig, spark_session: SparkSession) -> pd.DataFr
     return sample
 
 
+@pytest.fixture(scope="function")
+def stats_data(config: ProjectConfig, spark_session: SparkSession) -> pd.DataFrame:
+    """Create a sample DataFrame from a CSV file.
+
+    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
+
+    :return: A sampled Pandas DataFrame containing some sample of the original data.
+    """
+    file_path = PROJECT_DIR / "tests" / "test_data" / "stats_data.csv"
+    stats_data = pd.read_csv(file_path.as_posix())
+
+    # Alternative approach to reading the sample
+    # Important Note: Replace NaN with None in Pandas Before Conversion to Spark DataFrame:
+    # sample = sample.where(sample.notna(), None)  # noqa
+    # sample = spark_session.createDataFrame(sample).toPandas()  # noqa
+    return stats_data
+
+
 @pytest.fixture(scope="session")
 def tags() -> Tags:
     """Create and return a Tags instance for the test session.

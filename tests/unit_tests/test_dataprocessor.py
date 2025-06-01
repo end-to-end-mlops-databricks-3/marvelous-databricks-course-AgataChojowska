@@ -5,7 +5,7 @@ import pytest
 from conftest import CATALOG_DIR
 
 from tennis.config import ProjectConfig
-from tennis.data_processor import DataProcessor
+from tennis.data_processor import DataProcessor, split_data
 
 
 def test_data_ingestion(sample_data: pd.DataFrame) -> None:
@@ -43,6 +43,7 @@ def test_column_transformations(sample_data: pd.DataFrame, config: ProjectConfig
     :param sample_data: Input DataFrame containing sample data
     :param config: Configuration object for the project
     """
+    print(sample_data.head())
     processor = DataProcessor(raw_data=sample_data, config=config)
     processed_data = processor.process_data()
 
@@ -81,7 +82,7 @@ def test_column_selection(sample_data: pd.DataFrame, config: ProjectConfig) -> N
     assert "RESULT" in processed_data.columns
 
 
-def test_split_data_default_params(sample_data: pd.DataFrame, config: ProjectConfig) -> None:
+def test_split_data_default_params(stats_data: pd.DataFrame, config: ProjectConfig) -> None:
     """Test the default parameters of the split_data method in DataProcessor.
 
     This function tests if the split_data method correctly splits the input DataFrame
@@ -90,18 +91,17 @@ def test_split_data_default_params(sample_data: pd.DataFrame, config: ProjectCon
     :param sample_data: Input DataFrame to be split
     :param config: Configuration object for the project
     """
-    processor = DataProcessor(raw_data=sample_data, config=config)
-    train, test = processor.split_data(sample_data)
+    X_train, X_test, y_train, y_test = split_data(stats_data, config=config)
 
-    assert isinstance(train, pd.DataFrame)
-    assert isinstance(test, pd.DataFrame)
-    assert len(train) + len(test) == len(processor.raw_data)
-    assert set(train.columns) == set(test.columns) == set(processor.raw_data.columns)
+    assert isinstance(X_train, pd.DataFrame)
+    assert isinstance(X_test, pd.DataFrame)
+    assert len(X_train) + len(X_test) == len(stats_data)
+    assert set(X_train.columns) == set(X_test.columns)
 
     # # The following lines are just to mimick the behavior of delta tables in UC
     # # Just one time execution in order for all other tests to work
-    train.to_csv((CATALOG_DIR / "train_set.csv").as_posix(), index=False)  # noqa
-    test.to_csv((CATALOG_DIR / "test_set.csv").as_posix(), index=False)  # noqa
+    X_train.to_csv((CATALOG_DIR / "train_set.csv").as_posix(), index=False)  # noqa
+    X_test.to_csv((CATALOG_DIR / "test_set.csv").as_posix(), index=False)  # noqa
 
 
 def test_preprocess_empty_dataframe(config: ProjectConfig) -> None:
