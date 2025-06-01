@@ -100,8 +100,10 @@ def test_split_data_default_params(stats_data: pd.DataFrame, config: ProjectConf
 
     # # The following lines are just to mimick the behavior of delta tables in UC
     # # Just one time execution in order for all other tests to work
-    X_train.to_csv((CATALOG_DIR / "train_set.csv").as_posix(), index=False)  # noqa
-    X_test.to_csv((CATALOG_DIR / "test_set.csv").as_posix(), index=False)  # noqa
+    X_train.to_csv((CATALOG_DIR / "X_train.csv").as_posix(), index=False)  # noqa
+    X_test.to_csv((CATALOG_DIR / "X_test.csv").as_posix(), index=False)  # noqa
+    y_train.to_csv((CATALOG_DIR / "y_train.csv").as_posix(), index=False)  # noqa
+    y_test.to_csv((CATALOG_DIR / "y_test.csv").as_posix(), index=False)  # noqa
 
 
 def test_preprocess_empty_dataframe(config: ProjectConfig) -> None:

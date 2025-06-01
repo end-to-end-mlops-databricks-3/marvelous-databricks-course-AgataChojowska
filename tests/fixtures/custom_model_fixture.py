@@ -1,0 +1,204 @@
+"""Data fixture."""
+
+import os
+import shutil
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import pandas as pd
+import pytest
+from conftest import CATALOG_DIR, MLRUNS_DIR
+from loguru import logger
+from pyspark.sql import SparkSession
+
+from tennis import PROJECT_DIR
+from tennis.config import ProjectConfig, Tags
+from tennis.models.custom_model import TennisModel
+
+whl_file_name = None  # Global variable to store the .whl file name
+
+
+@pytest.fixture(scope="session")
+def tags() -> Tags:
+    """Create and return a Tags instance for the test session.
+
+    This fixture provides a Tags object with predefined values for git_sha, branch, and job_run_id.
+    """
+    return Tags(git_sha="wxyz", branch="test", job_run_id="9")
+
+
+@pytest.fixture(scope="function")
+def X_train() -> pd.DataFrame:
+    """Create a sample DataFrame from a CSV file.
+
+    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
+
+    :return: A sampled Pandas DataFrame containing some sample of the original data.
+    """
+    file_path = PROJECT_DIR / "tests" / "test_data" / "X_train.csv"
+    X_train = pd.read_csv(file_path.as_posix())
+    return X_train
+
+
+@pytest.fixture(scope="function")
+def X_test() -> pd.DataFrame:
+    """Create a sample DataFrame from a CSV file.
+
+    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
+
+    :return: A sampled Pandas DataFrame containing some sample of the original data.
+    """
+    file_path = PROJECT_DIR / "tests" / "test_data" / "X_test.csv"
+    X_test = pd.read_csv(file_path.as_posix())
+    return X_test
+
+
+@pytest.fixture(scope="function")
+def y_test() -> pd.DataFrame:
+    """Create a sample DataFrame from a CSV file.
+
+    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
+
+    :return: A sampled Pandas DataFrame containing some sample of the original data.
+    """
+    file_path = PROJECT_DIR / "tests" / "test_data" / "y_test.csv"
+    y_test = pd.read_csv(file_path.as_posix())
+    return y_test
+
+
+@pytest.fixture(scope="function")
+def y_train() -> pd.DataFrame:
+    """Create a sample DataFrame from a CSV file.
+
+    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
+
+    :return: A sampled Pandas DataFrame containing some sample of the original data.
+    """
+    file_path = PROJECT_DIR / "tests" / "test_data" / "y_train.csv"
+    y_train = pd.read_csv(file_path.as_posix())
+    return y_train
+
+
+@pytest.fixture(scope="session", autouse=True)
+def create_mlruns_directory() -> None:
+    """Create or recreate the MLFlow tracking directory.
+
+    This fixture ensures that the MLFlow tracking directory is clean and ready for use
+    before each test session.
+    """
+    if MLRUNS_DIR.exists():
+        shutil.rmtree(MLRUNS_DIR)
+        MLRUNS_DIR.mkdir()
+        logger.info(f"Created {MLRUNS_DIR} directory for MLFlow tracking")
+    else:
+        logger.info(f"MLFlow tracking directory {MLRUNS_DIR} does not exist")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def build_whl_file() -> None:
+    """Session-scoped fixture to build a .whl file for the project.
+
+    This fixture ensures that the project's distribution directory is cleaned,
+    the build process is executed, and the resulting .whl file is identified.
+    The fixture runs automatically once per test session.
+
+    :raises RuntimeError: If an unexpected error occurs during the build process.
+    :raises FileNotFoundError: If the dist directory or .whl file is not found.
+    """
+    global whl_file_name
+    dist_directory_path = PROJECT_DIR / "dist"
+    original_directory = Path.cwd()  # Save the current working directory
+
+    try:
+        # Clean up the dist directory if it exists
+        if dist_directory_path.exists():
+            shutil.rmtree(dist_directory_path)
+
+        # Change to project directory and execute 'uv build'
+        os.chdir(PROJECT_DIR)
+        subprocess.run(["uv", "build"], check=True, text=True, capture_output=True)
+
+        # Ensure the dist directory exists after the build
+        if not dist_directory_path.exists():
+            raise FileNotFoundError(f"Dist directory does not exist: {dist_directory_path}")
+
+        # Get list of files in the dist directory
+        files = [entry.name for entry in dist_directory_path.iterdir() if entry.is_file()]
+
+        # Find the first .whl file
+        whl_file = next((file for file in files if file.endswith(".whl")), None)
+        if not whl_file:
+            raise FileNotFoundError("No .whl file found in the dist directory.")
+
+        # Set the global variable with the .whl file name
+        whl_file_name = whl_file
+
+    except Exception as err:
+        raise RuntimeError(f"Unexpected error occurred: {err}") from err
+
+    finally:
+        # Restore the original working directory
+        os.chdir(original_directory)
+
+
+@pytest.fixture(scope="function")
+def mock_custom_model(
+    config: ProjectConfig,
+    tags: Tags,
+    spark_session: SparkSession,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
+    y_train: pd.DataFrame,
+    y_test: pd.DataFrame,
+) -> TennisModel:
+    """Fixture that provides a TennisModel instance with mocked Spark interactions.
+
+    Initializes the model with test data and mocks Spark DataFrame conversions to pandas.
+
+    :param config: Project configuration parameters
+    :param tags: Tagging metadata for model tracking
+    :param spark_session: Spark session instance for testing environment
+    :return: Configured TennisModel instance with mocked Spark interactions
+    """
+    instance = TennisModel(
+        config=config,
+        tags=tags,
+        spark=spark_session,
+        code_paths=[f"{PROJECT_DIR.as_posix()}/dist/{whl_file_name}"],
+        X_train=X_train,
+        X_test=X_test,
+        y_train=y_train,
+        y_test=y_test,
+    )
+
+    X_train = pd.read_csv((CATALOG_DIR / "X_train.csv").as_posix())
+    # Important Note: Replace NaN with None in Pandas
+    X_train = X_train.where(X_train.notna(), None)  # noqa
+
+    X_test = pd.read_csv((CATALOG_DIR / "X_test.csv").as_posix())
+    X_test = X_test.where(X_test.notna(), None)  # noqa
+
+    y_test = pd.read_csv((CATALOG_DIR / "y_test.csv").as_posix())
+    y_test = y_test.where(y_test.notna(), None)  # noqa
+
+    y_test = pd.read_csv((CATALOG_DIR / "y_test.csv").as_posix())
+    y_test = y_test.where(y_test.notna(), None)  # noqa
+
+    ## Mock Spark interactions
+    # Mock Spark DataFrame with toPandas() method
+    mock_spark_df_train = MagicMock()
+    mock_spark_df_train.toPandas.return_value = X_train
+    mock_spark_df_test = MagicMock()
+    mock_spark_df_test.toPandas.return_value = X_test
+    mock_spark_df_test = MagicMock()
+    mock_spark_df_test.toPandas.return_value = y_test
+    mock_spark_df_test = MagicMock()
+    mock_spark_df_test.toPandas.return_value = y_test
+
+    # Mock spark.table method
+    mock_spark = MagicMock()
+    mock_spark.table.side_effect = [mock_spark_df_train, mock_spark_df_test]
+    instance.spark = mock_spark
+
+    return instance

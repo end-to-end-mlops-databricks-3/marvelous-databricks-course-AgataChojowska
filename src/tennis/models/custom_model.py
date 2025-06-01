@@ -24,7 +24,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from tennis.config import ProjectConfig
+from tennis.config import ProjectConfig, Tags
 
 
 def adjust_predictions(predictions: pd.DataFrame) -> pd.DataFrame:
@@ -71,7 +71,7 @@ class TennisModel:
         self,
         config: ProjectConfig,
         spark: SparkSession,
-        tags: dict,
+        tags: Tags,
         code_paths: list,
         X_train: pd.DataFrame,
         y_train: pd.DataFrame,
@@ -80,7 +80,7 @@ class TennisModel:
     ) -> None:
         self.config = config
         self.spark = spark
-        self.tags = tags
+        self.tags = tags.model_dump()
         self.experiment_name = self.config.experiment_name_custom
         self.code_paths = code_paths
         self.X_train = X_train
