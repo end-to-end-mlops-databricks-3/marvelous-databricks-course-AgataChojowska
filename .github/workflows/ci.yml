@@ -1,6 +1,9 @@
 name: CI
 
 on:
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
@@ -35,7 +38,7 @@ jobs:
 
       - name: Run pre-commit checks
         run: |
-          uv run pre-commit run --all-files --hook-stage manual
+          uv run pre-commit run --all-files
 
       - name: run pytest
         run: |
