@@ -19,14 +19,14 @@ sys.path.append(str(Path.cwd().parent / 'src'))
 # COMMAND ----------
 
 # A better approach (this file must be present in a notebook folder, achieved via synchronization)
-%pip install house_price-1.0.1-py3-none-any.whl
+%pip install tennis-1.0.1-py3-none-any.whl
 
 # COMMAND ----------
 
 from pyspark.sql import SparkSession
 import mlflow
 
-from house_price.config import ProjectConfig
+from tennis.config import ProjectConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -37,7 +37,7 @@ from dotenv import load_dotenv
 import os
 from mlflow import MlflowClient
 import pandas as pd
-from house_price import __version__
+from tennis import __version__
 from mlflow.utils.environment import _mlflow_conda_env
 from databricks import feature_engineering
 from databricks.feature_engineering import FeatureFunction, FeatureLookup

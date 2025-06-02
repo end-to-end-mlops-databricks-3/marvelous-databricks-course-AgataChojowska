@@ -1,23 +1,21 @@
 """Tennis match model training and registration."""
 
 import argparse
+import os
 from typing import Literal
 
 import mlflow
 import pandas as pd
+from dotenv import load_dotenv
 from loguru import logger
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
 from tennis.catalog_utils import load_from_table_to_pandas
-from tennis.config import ProjectConfig
+from tennis.config import ProjectConfig, Tags
 from tennis.models.custom_model import TennisModel
-from tennis.runtime_utils import get_spark
+from tennis.runtime_utils import get_spark, running_on_databricks
 from tennis.stats_calculator import StatsCalculator
-
-# Configure tracking uri
-mlflow.set_tracking_uri("databricks://dev")  # On Databricks might look different
-mlflow.set_registry_uri("databricks-uc://dev")
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -123,12 +121,20 @@ def predict(config: ProjectConfig, spark: SparkSession, custom_model: TennisMode
 
 def main(mode: Literal["train", "predict", "full"]) -> None:
     """Run model training and registering and/or prediction."""
+    # 0 Configure tracking uri
+    if not running_on_databricks():
+        load_dotenv()
+        profile = os.environ["PROFILE"]
+        mlflow.set_tracking_uri(f"databricks://{profile}")
+        mlflow.set_registry_uri(f"databricks-uc://{profile}")
+
     # 1 Parse args, set config, get tags.
     args = parser.parse_args()
     root_path = args.root_path
     config_path = f"{root_path}/project_config.yml"
     config = ProjectConfig.from_yaml(config_path=config_path, env=args.env)
     tags_dict = {"git_sha": args.git_sha, "branch": args.branch, "job_run_id": args.job_run_id}
+    tags = Tags(**tags_dict)
 
     # 2 Load the data
     spark = get_spark()
@@ -150,7 +156,7 @@ def main(mode: Literal["train", "predict", "full"]) -> None:
     # 3 Initialize model
     custom_model = TennisModel(
         config=config,
-        tags=tags_dict,
+        tags=tags,
         spark=spark,
         code_paths=["dist/tennis-0.0.1-py3-none-any.whl"],
         X_train=X_train,
