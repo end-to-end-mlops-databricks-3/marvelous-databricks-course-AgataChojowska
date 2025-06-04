@@ -82,7 +82,7 @@ def test_column_selection(sample_data: pd.DataFrame, config: ProjectConfig) -> N
     assert "RESULT" in processed_data.columns
 
 
-def test_split_data_default_params(stats_data: pd.DataFrame, config: ProjectConfig) -> None:
+def test_split_data_default_params(stats_data: pd.DataFrame) -> None:
     """Test the default parameters of the split_data method in DataProcessor.
 
     This function tests if the split_data method correctly splits the input DataFrame
@@ -91,19 +91,17 @@ def test_split_data_default_params(stats_data: pd.DataFrame, config: ProjectConf
     :param sample_data: Input DataFrame to be split
     :param config: Configuration object for the project
     """
-    X_train, X_test, y_train, y_test = split_data(stats_data, config=config)
+    train_set, test_set = split_data(stats_data)
 
-    assert isinstance(X_train, pd.DataFrame)
-    assert isinstance(X_test, pd.DataFrame)
-    assert len(X_train) + len(X_test) == len(stats_data)
-    assert set(X_train.columns) == set(X_test.columns)
+    assert isinstance(train_set, pd.DataFrame)
+    assert isinstance(test_set, pd.DataFrame)
+    assert len(train_set) + len(test_set) == len(stats_data)
+    assert set(train_set.columns) == set(test_set.columns)
 
     # # The following lines are just to mimick the behavior of delta tables in UC
     # # Just one time execution in order for all other tests to work
-    X_train.to_csv((CATALOG_DIR / "X_train.csv").as_posix(), index=False)  # noqa
-    X_test.to_csv((CATALOG_DIR / "X_test.csv").as_posix(), index=False)  # noqa
-    y_train.to_csv((CATALOG_DIR / "y_train.csv").as_posix(), index=False)  # noqa
-    y_test.to_csv((CATALOG_DIR / "y_test.csv").as_posix(), index=False)  # noqa
+    train_set.to_csv((CATALOG_DIR / "train_set.csv").as_posix(), index=False)  # noqa
+    test_set.to_csv((CATALOG_DIR / "test_set.csv").as_posix(), index=False)  # noqa
 
 
 def test_preprocess_empty_dataframe(config: ProjectConfig) -> None:

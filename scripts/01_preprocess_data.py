@@ -50,7 +50,7 @@ def main() -> None:
     logger.info(f"Data preprocessing completed in: {preprocess_timer}")
 
     # Split the data
-    X_train, X_test = split_data(df=stats_data, config=config)
+    X_train, X_test = split_data(df=stats_data)
     logger.info("Training set shape: %s", X_train.shape)
     logger.info("Test set shape: %s", X_test.shape)
 

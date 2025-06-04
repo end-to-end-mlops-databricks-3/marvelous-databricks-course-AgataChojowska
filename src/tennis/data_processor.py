@@ -27,7 +27,7 @@ class DataProcessor:
         self.raw_data["year"] = self.raw_data["tourney_date"].astype(str).str[:4].astype(int)
         df_filtered = self.raw_data[
             (self.raw_data["year"] >= self.config.processing.start_year)
-            & (self.raw_data["year"] < self.config.processing.end_year)
+            & (self.raw_data["year"] <= self.config.processing.end_year)
         ]
         return df_filtered
 
@@ -119,6 +119,7 @@ class DataProcessor:
 
         logger.info(f"Final dataset: {len(df_final)} matches")
         logger.info(df_final.columns)
+        logger.info(df_final.shape)
 
         return df_final
 

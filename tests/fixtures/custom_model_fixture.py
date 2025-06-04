@@ -29,55 +29,29 @@ def tags() -> Tags:
 
 
 @pytest.fixture(scope="function")
-def X_train() -> pd.DataFrame:
+def train_set() -> pd.DataFrame:
     """Create a sample DataFrame from a CSV file.
 
     This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
 
     :return: A sampled Pandas DataFrame containing some sample of the original data.
     """
-    file_path = PROJECT_DIR / "tests" / "test_data" / "X_train.csv"
+    file_path = PROJECT_DIR / "tests" / "test_data" / "train_set.csv"
     X_train = pd.read_csv(file_path.as_posix())
     return X_train
 
 
 @pytest.fixture(scope="function")
-def X_test() -> pd.DataFrame:
+def test_set() -> pd.DataFrame:
     """Create a sample DataFrame from a CSV file.
 
     This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
 
     :return: A sampled Pandas DataFrame containing some sample of the original data.
     """
-    file_path = PROJECT_DIR / "tests" / "test_data" / "X_test.csv"
+    file_path = PROJECT_DIR / "tests" / "test_data" / "test_set.csv"
     X_test = pd.read_csv(file_path.as_posix())
     return X_test
-
-
-@pytest.fixture(scope="function")
-def y_test() -> pd.DataFrame:
-    """Create a sample DataFrame from a CSV file.
-
-    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
-
-    :return: A sampled Pandas DataFrame containing some sample of the original data.
-    """
-    file_path = PROJECT_DIR / "tests" / "test_data" / "y_test.csv"
-    y_test = pd.read_csv(file_path.as_posix())
-    return y_test
-
-
-@pytest.fixture(scope="function")
-def y_train() -> pd.DataFrame:
-    """Create a sample DataFrame from a CSV file.
-
-    This fixture reads a CSV file using either Spark or pandas, then converts it to a Pandas DataFrame,
-
-    :return: A sampled Pandas DataFrame containing some sample of the original data.
-    """
-    file_path = PROJECT_DIR / "tests" / "test_data" / "y_train.csv"
-    y_train = pd.read_csv(file_path.as_posix())
-    return y_train
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -147,10 +121,8 @@ def mock_custom_model(
     config: ProjectConfig,
     tags: Tags,
     spark_session: SparkSession,
-    X_train: pd.DataFrame,
-    X_test: pd.DataFrame,
-    y_train: pd.DataFrame,
-    y_test: pd.DataFrame,
+    train_set: pd.DataFrame,
+    test_set: pd.DataFrame,
 ) -> TennisModel:
     """Fixture that provides a TennisModel instance with mocked Spark interactions.
 
@@ -166,35 +138,23 @@ def mock_custom_model(
         tags=tags,
         spark=spark_session,
         code_paths=[f"{PROJECT_DIR.as_posix()}/dist/{whl_file_name}"],
-        X_train=X_train,
-        X_test=X_test,
-        y_train=y_train,
-        y_test=y_test,
+        train_set=train_set,
+        test_set=test_set,
     )
 
-    X_train = pd.read_csv((CATALOG_DIR / "X_train.csv").as_posix())
+    train_set = pd.read_csv((CATALOG_DIR / "train_set.csv").as_posix())
     # Important Note: Replace NaN with None in Pandas
-    X_train = X_train.where(X_train.notna(), None)  # noqa
+    train_set = train_set.where(train_set.notna(), None)  # noqa
 
-    X_test = pd.read_csv((CATALOG_DIR / "X_test.csv").as_posix())
-    X_test = X_test.where(X_test.notna(), None)  # noqa
-
-    y_test = pd.read_csv((CATALOG_DIR / "y_test.csv").as_posix())
-    y_test = y_test.where(y_test.notna(), None)  # noqa
-
-    y_test = pd.read_csv((CATALOG_DIR / "y_test.csv").as_posix())
-    y_test = y_test.where(y_test.notna(), None)  # noqa
+    test_set = pd.read_csv((CATALOG_DIR / "test_set.csv").as_posix())
+    test_set = test_set.where(test_set.notna(), None)  # noqa
 
     ## Mock Spark interactions
     # Mock Spark DataFrame with toPandas() method
     mock_spark_df_train = MagicMock()
-    mock_spark_df_train.toPandas.return_value = X_train
+    mock_spark_df_train.toPandas.return_value = train_set
     mock_spark_df_test = MagicMock()
-    mock_spark_df_test.toPandas.return_value = X_test
-    mock_spark_df_test = MagicMock()
-    mock_spark_df_test.toPandas.return_value = y_test
-    mock_spark_df_test = MagicMock()
-    mock_spark_df_test.toPandas.return_value = y_test
+    mock_spark_df_test.toPandas.return_value = test_set
 
     # Mock spark.table method
     mock_spark = MagicMock()

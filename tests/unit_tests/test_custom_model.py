@@ -18,13 +18,7 @@ mlflow.set_tracking_uri(TRACKING_URI)
 
 
 def test_custom_model_init(
-    config: ProjectConfig,
-    tags: Tags,
-    spark_session: SparkSession,
-    X_train: pd.DataFrame,
-    y_train: pd.Series,
-    X_test: pd.DataFrame,
-    y_test: pd.Series,
+    config: ProjectConfig, tags: Tags, spark_session: SparkSession, train_set: pd.DataFrame, test_set: pd.DataFrame
 ) -> None:
     """Test the initialization of TennisModel.
 
@@ -35,14 +29,7 @@ def test_custom_model_init(
     :param spark_session: Spark session object
     """
     model = TennisModel(
-        config=config,
-        tags=tags,
-        spark=spark_session,
-        code_paths=[],
-        X_train=X_train,
-        y_train=y_train,
-        X_test=X_test,
-        y_test=y_test,
+        config=config, tags=tags, spark=spark_session, code_paths=[], train_set=train_set, test_set=test_set
     )
     assert isinstance(model, TennisModel)
     assert isinstance(model.config, ProjectConfig)
