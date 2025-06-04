@@ -73,21 +73,19 @@ class TennisModel:
         spark: SparkSession,
         tags: Tags,
         code_paths: list,
-        X_train: pd.DataFrame,
-        y_train: pd.DataFrame,
-        X_test: pd.DataFrame,
-        y_test: pd.DataFrame,
+        train_set: pd.DataFrame,
+        test_set: pd.DataFrame,
     ) -> None:
         self.config = config
         self.spark = spark
         self.tags = tags.model_dump()
         self.experiment_name = self.config.experiment_name_custom
         self.code_paths = code_paths
-        self.X_train = X_train
-        self.y_train = y_train
-        self.X_test = X_test
-        self.y_test = y_test
-        self.parameters = self.config.parameters
+        self.X_train = train_set[config.features]
+        self.y_train = train_set[config.target_name]
+        self.X_test = test_set[config.features]
+        self.y_test = test_set[config.target_name]
+        self.parameters = self.config.parameters  #
 
     def prepare_features(self) -> None:
         """Prepare features for model training.
@@ -96,18 +94,13 @@ class TennisModel:
         features and XGBoost regression model.
         """
         logger.info("🔄 Defining preprocessing pipeline...")
-        self.pipeline = Pipeline(
-            steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**self.parameters))]
-        )  # TODO mapper to string ?
+        self.pipeline = Pipeline(steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**self.parameters))])
 
         logger.info("✅ Preprocessing pipeline defined.")
 
     def train(self) -> None:
         """Train the model using the prepared pipeline."""
         logger.info("🚀 Starting training...")
-        self.y_train = self.y_train[self.y_train.columns[0]]
-        logger.info(f"DATA TYPE {type(self.y_train)}")
-        logger.info(self.y_train.head())
         self.pipeline.fit(self.X_train, self.y_train)
 
     def log_model(self) -> None:

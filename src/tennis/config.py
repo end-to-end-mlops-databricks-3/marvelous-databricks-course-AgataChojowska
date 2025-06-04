@@ -24,6 +24,8 @@ class DataProcessingConfig(BaseModel):
 class Tables(BaseModel):
     """Tables configurations."""
 
+    gold: str
+    silver: str
     train: str
     test: str
 
@@ -41,6 +43,7 @@ class ProjectConfig(BaseModel):
     parameters: dict[str, Any]
     target_name: str
     features: list[str]
+    primary_key_cols: list[str]
 
     @classmethod
     def from_yaml(cls, config_path: str, env: str = "dev") -> "ProjectConfig":

@@ -102,7 +102,7 @@ def predict(config: ProjectConfig, spark: SparkSession, custom_model: TennisMode
         "SURFACE": "Clay",  # Surface of the match. Options are ("Hard", "Clay", "Grass", "Carpet")
     }
     stats = StatsCalculator()
-    clean_data = load_from_table_to_pandas(spark=spark, config=config, table="clean_data").drop(
+    clean_data = load_from_table_to_pandas(spark=spark, config=config, table=config.tables.silver).drop(
         "update_timestamp_utc", axis=1
     )
     prev_stats = stats.get_updated_stats(clean_data=clean_data)
@@ -139,17 +139,11 @@ def main(mode: Literal["train", "predict", "full"]) -> None:
     # 2 Load the data
     spark = get_spark()
     dbutils = DBUtils(spark)
-    X_train = load_from_table_to_pandas(spark=spark, config=config, table="train_set").drop(
-        "update_timestamp_utc", axis=1
+    train_set = load_from_table_to_pandas(spark=spark, config=config, table="train_set").drop(
+        ["Id", "update_timestamp_utc"], axis=1
     )
-    y_train = load_from_table_to_pandas(spark=spark, config=config, table="train_target").drop(
-        "update_timestamp_utc", axis=1
-    )
-    X_test = load_from_table_to_pandas(spark=spark, config=config, table="test_set").drop(
-        "update_timestamp_utc", axis=1
-    )
-    y_test = load_from_table_to_pandas(spark=spark, config=config, table="test_target").drop(
-        "update_timestamp_utc", axis=1
+    test_set = load_from_table_to_pandas(spark=spark, config=config, table="test_set").drop(
+        ["Id", "update_timestamp_utc"], axis=1
     )
     logger.info("Loaded tables")
 
@@ -159,10 +153,8 @@ def main(mode: Literal["train", "predict", "full"]) -> None:
         tags=tags,
         spark=spark,
         code_paths=["dist/tennis-0.0.1-py3-none-any.whl"],
-        X_train=X_train,
-        X_test=X_test,
-        y_train=y_train,
-        y_test=y_test,
+        train_set=train_set,
+        test_set=test_set,
     )
     logger.info("Model initialized.")
 

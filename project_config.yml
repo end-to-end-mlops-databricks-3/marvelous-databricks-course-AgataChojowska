@@ -28,6 +28,10 @@ processing:
   start_year: 2022
   end_year: 2024
 
+primary_key_cols:
+  - tourney_id
+  - match_num
+
 columns:
   winner:
     - winner_id
@@ -103,6 +107,8 @@ columns:
     - surface
 
 tables:
+  gold: gold_set
+  silver: silver_set
   train: train_set
   test: test_set
 

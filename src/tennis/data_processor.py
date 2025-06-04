@@ -1,5 +1,7 @@
 """Tennis Data Processor for match outcome prediction."""
 
+import re
+
 import numpy as np
 import pandas as pd
 from loguru import logger
@@ -73,6 +75,29 @@ class DataProcessor:
 
         return df_randomized
 
+    def replace_letters_with_numbers(self, text: str) -> str:
+        """Replace each letter with its position in alphabet, keep numbers same."""
+        if pd.isna(text):
+            return text
+
+        def letter_to_number(match: str) -> str:
+            """Change letter to number with its position in alphabet."""
+            letter = match.group(0).upper()
+            return str(ord(letter) - ord("A") + 1)
+
+        return re.sub(r"[A-Za-z]", letter_to_number, str(text))
+
+    def text_cols_to_numbers_cols(self, df: pd.DataFrame, col_name: str = "Id") -> pd.DataFrame:
+        """Replace rach letter with its position in alphabet in the whole column."""
+        df[col_name] = df[col_name].apply(self.replace_letters_with_numbers)
+        return df
+
+    def merge_cols_into_one(self, df: pd.DataFrame, new_col_name: str = "Id", sep: str = "") -> pd.DataFrame:
+        """Merge contents of 2 columns into one new column."""
+        df[new_col_name] = df[self.config.primary_key_cols].astype(str).agg(sep.join, axis=1)
+        df[new_col_name] = df[new_col_name].str.replace("-", "")
+        return df
+
     def process_data(self) -> pd.DataFrame:
         """Execute full data processing pipeline."""
         logger.info(
@@ -87,10 +112,15 @@ class DataProcessor:
 
         logger.info("Randomizing player assignments...")
         df_processed = self.randomize_players(df_cleaned)
-        logger.info(f"Final dataset: {len(df_processed)} matches")
-        logger.info(df_processed.columns)
 
-        return df_processed
+        logger.info("Getting the primary key column...")
+        df_merged = self.merge_cols_into_one(df_processed)
+        df_final = self.text_cols_to_numbers_cols(df_merged)
+
+        logger.info(f"Final dataset: {len(df_final)} matches")
+        logger.info(df_final.columns)
+
+        return df_final
 
 
 def split_data(
@@ -102,9 +132,5 @@ def split_data(
     :param random_state: Controls the shuffling applied to the data before applying the split.
     :return: A tuple containing the training and test DataFrames.
     """
-    X = df.drop(config.target_name, axis=1)  # Features only
-    y = df[config.target_name]
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-    return X_train, X_test, y_train, y_test
+    train_set, test_set = train_test_split(df, test_size=test_size, random_state=random_state)  #
+    return train_set, test_set

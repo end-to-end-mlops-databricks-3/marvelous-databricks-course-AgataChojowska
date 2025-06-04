@@ -278,6 +278,7 @@ class StatsCalculator:
             # Append sorted stats to final dataset
             match_data = dict(sorted(output.items()))
             match_data["RESULT"] = row.RESULT
+            match_data["Id"] = row.Id
             final_dataset.append(match_data)
 
             ########## UPDATE STATS ##########

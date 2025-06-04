@@ -50,18 +50,19 @@ def main() -> None:
     logger.info(f"Data preprocessing completed in: {preprocess_timer}")
 
     # Split the data
-    X_train, X_test, y_train, y_test = split_data(df=stats_data, config=config)
+    X_train, X_test = split_data(df=stats_data, config=config)
     logger.info("Training set shape: %s", X_train.shape)
     logger.info("Test set shape: %s", X_test.shape)
-    logger.info("Target train shape: %s", y_train.shape)
-    logger.info("Target test shape: %s", y_test.shape)
 
     # Save to catalog
     logger.info("Saving cleaned data to catalog")
-    save_to_catalog(dataset=clean_data, config=config, spark=spark, table_name="clean_data")
+    save_to_catalog(dataset=clean_data, config=config, spark=spark, table_name=config.tables.silver)
 
     logger.info("Saving stats data to catalog")
-    datasets = {"train_set": X_train, "test_set": X_test, "train_target": y_train, "test_target": y_test}
+    save_to_catalog(dataset=stats_data, config=config, spark=spark, table_name=config.tables.gold)
+
+    logger.info("Saving train and test data to catalog")
+    datasets = {"train_set": X_train, "test_set": X_test}
     for table_name, dataset in datasets.items():
         save_to_catalog(dataset=dataset, config=config, spark=spark, table_name=table_name)
 
