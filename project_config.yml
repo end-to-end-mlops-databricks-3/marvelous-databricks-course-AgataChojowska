@@ -1,0 +1,182 @@
+prd:
+  catalog_name: mlops_prd
+  schema_name: chojowsk
+  file_path: atp_matches/atp_matches_*.csv
+acc:
+  catalog_name: mlops_acc
+  schema_name: chojowsk
+  file_path: atp_matches/atp_matches_*.csv
+dev:
+  catalog_name: mlops_dev
+  schema_name: chojowsk
+  file_path: atp_matches/atp_matches_2022.csv
+
+experiment_name_custom: /Shared/tennis-custom
+
+target_name: "RESULT"
+
+parameters:
+  colsample_bytree: 0.6
+  learning_rate: 0.05
+  max_depth: 5
+  n_estimators: 100
+  reg_alpha: 0.5
+  reg_lambda: 0.5
+  subsample: 0.7
+
+processing:
+  start_year: 2022
+  end_year: 2024
+
+primary_key_cols:
+  - tourney_id
+  - match_num
+
+columns:
+  winner:
+    - winner_id
+    - winner_seed
+    - winner_entry
+    - winner_name
+    - winner_hand
+    - winner_ht
+    - winner_ioc
+    - winner_age
+    - w_ace
+    - w_df
+    - w_svpt
+    - w_1stIn
+    - w_1stWon
+    - w_2ndWon
+    - w_SvGms
+    - w_bpSaved
+    - w_bpFaced
+    - winner_rank
+    - winner_rank_points
+
+  loser:
+    - loser_id
+    - loser_seed
+    - loser_entry
+    - loser_name
+    - loser_hand
+    - loser_ht
+    - loser_ioc
+    - loser_age
+    - l_ace
+    - l_df
+    - l_svpt
+    - l_1stIn
+    - l_1stWon
+    - l_2ndWon
+    - l_SvGms
+    - l_bpSaved
+    - l_bpFaced
+    - loser_rank
+    - loser_rank_points
+
+  required:
+    - winner_id
+    - loser_id
+    - winner_ht
+    - loser_ht
+    - winner_age
+    - loser_age
+    - w_ace
+    - w_df
+    - w_svpt
+    - w_1stIn
+    - w_1stWon
+    - w_2ndWon
+    - w_SvGms
+    - w_bpSaved
+    - w_bpFaced
+    - l_ace
+    - l_df
+    - l_svpt
+    - l_1stIn
+    - l_1stWon
+    - l_2ndWon
+    - l_SvGms
+    - l_bpSaved
+    - l_bpFaced
+    - winner_rank_points
+    - loser_rank_points
+    - winner_rank
+    - loser_rank
+    - surface
+
+tables:
+  gold: gold_set
+  silver: silver_set
+  train: train_set
+  test: test_set
+
+features:
+  - AGE_DIFF
+  - ATP_POINTS_DIFF
+  - ATP_RANK_DIFF
+  - BEST_OF
+  - DRAW_SIZE
+  - ELO_DIFF
+  - ELO_GRAD_LAST_100_DIFF
+  - ELO_GRAD_LAST_10_DIFF
+  - ELO_GRAD_LAST_200_DIFF
+  - ELO_GRAD_LAST_25_DIFF
+  - ELO_GRAD_LAST_3_DIFF
+  - ELO_GRAD_LAST_50_DIFF
+  - ELO_GRAD_LAST_5_DIFF
+  - ELO_SURFACE_DIFF
+  - H2H_DIFF
+  - H2H_SURFACE_DIFF
+  - HEIGHT_DIFF
+  - N_GAMES_DIFF
+  - P_1ST_IN_LAST_100_DIFF
+  - P_1ST_IN_LAST_10_DIFF
+  - P_1ST_IN_LAST_200_DIFF
+  - P_1ST_IN_LAST_25_DIFF
+  - P_1ST_IN_LAST_3_DIFF
+  - P_1ST_IN_LAST_50_DIFF
+  - P_1ST_IN_LAST_5_DIFF
+  - P_1ST_WON_LAST_100_DIFF
+  - P_1ST_WON_LAST_10_DIFF
+  - P_1ST_WON_LAST_200_DIFF
+  - P_1ST_WON_LAST_25_DIFF
+  - P_1ST_WON_LAST_3_DIFF
+  - P_1ST_WON_LAST_50_DIFF
+  - P_1ST_WON_LAST_5_DIFF
+  - P_2ND_WON_LAST_100_DIFF
+  - P_2ND_WON_LAST_10_DIFF
+  - P_2ND_WON_LAST_200_DIFF
+  - P_2ND_WON_LAST_25_DIFF
+  - P_2ND_WON_LAST_3_DIFF
+  - P_2ND_WON_LAST_50_DIFF
+  - P_2ND_WON_LAST_5_DIFF
+  - P_ACE_LAST_100_DIFF
+  - P_ACE_LAST_10_DIFF
+  - P_ACE_LAST_200_DIFF
+  - P_ACE_LAST_25_DIFF
+  - P_ACE_LAST_3_DIFF
+  - P_ACE_LAST_50_DIFF
+  - P_ACE_LAST_5_DIFF
+  - P_BP_SAVED_LAST_100_DIFF
+  - P_BP_SAVED_LAST_10_DIFF
+  - P_BP_SAVED_LAST_200_DIFF
+  - P_BP_SAVED_LAST_25_DIFF
+  - P_BP_SAVED_LAST_3_DIFF
+  - P_BP_SAVED_LAST_50_DIFF
+  - P_BP_SAVED_LAST_5_DIFF
+  - P_DF_LAST_100_DIFF
+  - P_DF_LAST_10_DIFF
+  - P_DF_LAST_200_DIFF
+  - P_DF_LAST_25_DIFF
+  - P_DF_LAST_3_DIFF
+  - P_DF_LAST_50_DIFF
+  - P_DF_LAST_5_DIFF
+  - WIN_LAST_100_DIFF
+  - WIN_LAST_10_DIFF
+  - WIN_LAST_200_DIFF
+  - WIN_LAST_25_DIFF
+  - WIN_LAST_3_DIFF
+  - WIN_LAST_50_DIFF
+  - WIN_LAST_5_DIFF
