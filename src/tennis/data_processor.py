@@ -124,7 +124,7 @@ class DataProcessor:
 
 
 def split_data(
-    df: pd.DataFrame, config: ProjectConfig, test_size: float = 0.2, random_state: int = 42
+    df: pd.DataFrame, test_size: float = 0.2, random_state: int = 42
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Split the DataFrame (self.df) into training and test sets.
 
@@ -132,5 +132,5 @@ def split_data(
     :param random_state: Controls the shuffling applied to the data before applying the split.
     :return: A tuple containing the training and test DataFrames.
     """
-    train_set, test_set = train_test_split(df, test_size=test_size, random_state=random_state)  #
+    train_set, test_set = train_test_split(df, test_size=test_size, random_state=random_state)
     return train_set, test_set
