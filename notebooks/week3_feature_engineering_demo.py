@@ -25,6 +25,7 @@ sys.path.append(str(Path.cwd().parent / 'src'))
 
 from pyspark.sql import SparkSession
 import mlflow
+import dotenv
 
 from tennis.config import ProjectConfig
 from sklearn.compose import ColumnTransformer
@@ -63,15 +64,19 @@ config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="dev")
 spark = SparkSession.builder.getOrCreate()
 fe = feature_engineering.FeatureEngineeringClient()
 
-train_set = spark.table(f"{config.catalog_name}.{config.schema_name}.train_set")
-test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set")
+# train_set = spark.table(f"{config.catalog_name}.{config.schema_name}.train_set")
+# test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set")
+
+# I'm using another table as it has a column that I can use as primary key.
+
+clean_set = spark.table(f"{config.catalog_name}.{config.schema_name}.clean_data")
 
 # COMMAND ----------
 
 # create feature table with information about houses
 
-feature_table_name = f"{config.catalog_name}.{config.schema_name}.house_features_demo"
-lookup_features = ["OverallQual", "GrLivArea", "GarageCars"]
+feature_table_name = f"{config.catalog_name}.{config.schema_name}.tennis_features_demo"
+lookup_features = ["tourney_name", "surface", "draw_size"]
 
 
 # COMMAND ----------
@@ -79,44 +84,51 @@ lookup_features = ["OverallQual", "GrLivArea", "GarageCars"]
 # Option 1: feature engineering client
 feature_table = fe.create_table(
    name=feature_table_name,
-   primary_keys=["Id"],
-   df=train_set[["Id"]+lookup_features],
-   description="House features table",
+   primary_keys=["tourney_id", "match_num", "year"],
+   df=clean_set[["tourney_id", "match_num", "year"]+lookup_features],
+   description="Tennis features table",
 )
 
 spark.sql(f"ALTER TABLE {feature_table_name} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
 
-fe.write_table(
-   name=feature_table_name,
-   df=test_set[["Id"]+lookup_features],
-   mode="merge",
-)
+# fe.write_table(
+#    name=feature_table_name,
+#    df=test_set[["Id"]+lookup_features],
+#    mode="merge",
+# )
 
 # COMMAND ----------
 
 # create feature table with information about houses
 # Option 2: SQL
 
+feature_table_name_sql = f"{config.catalog_name}.{config.schema_name}.tennis_features_demo_sql"
+
 spark.sql(f"""
           CREATE OR REPLACE TABLE {feature_table_name}
-          (Id STRING NOT NULL, OverallQual INT, GrLivArea INT, GarageCars INT);
+          (tourney_id STRING NOT NULL, 
+          match_num INT NOT NULL, 
+          year INT NOT NULL, 
+          tourney_name STRING NOT NULL, 
+          surface STRING NOT NULL, 
+          draw_size STRING NOT NULL);
           """)
 # primary key on Databricks is not enforced!
 try:
-    spark.sql(f"ALTER TABLE {feature_table_name} ADD CONSTRAINT house_pk_demo PRIMARY KEY(Id);")
+    spark.sql(f"ALTER TABLE {feature_table_name_sql} ADD CONSTRAINT tennis_pk_demo PRIMARY KEY(Id);")
 except AnalysisException:
     pass
-spark.sql(f"ALTER TABLE {feature_table_name} SET TBLPROPERTIES (delta.enableChangeDataFeed = true);")
+spark.sql(f"ALTER TABLE {feature_table_name_sql} SET TBLPROPERTIES (delta.enableChangeDataFeed = true);")
 spark.sql(f"""
-          INSERT INTO {feature_table_name}
-          SELECT Id, OverallQual, GrLivArea, GarageCars
-          FROM {config.catalog_name}.{config.schema_name}.train_set
+          INSERT INTO {feature_table_name_sql}
+          SELECT tourney_id, match_num, year, tourney_name, surface, draw_size
+          FROM {config.catalog_name}.{config.schema_name}.clean_data
           """)
-spark.sql(f"""
-          INSERT INTO {feature_table_name}
-          SELECT Id, OverallQual, GrLivArea, GarageCars
-          FROM {config.catalog_name}.{config.schema_name}.test_set
-          """)
+# spark.sql(f"""
+#           INSERT INTO {feature_table_name_sql}
+#           SELECT Id, OverallQual, GrLivArea, GarageCars
+#           FROM {config.catalog_name}.{config.schema_name}.test_set
+#           """)
 
 # COMMAND ----------
 
@@ -130,19 +142,19 @@ spark.sql(f"""
 # this is only supported from runtime 17
 # advised to use only for simple calculations
 
-function_name = f"{config.catalog_name}.{config.schema_name}.calculate_house_age_demo"
+function_name = f"{config.catalog_name}.{config.schema_name}.calculate_years_from_tournament_demo"
 
 # COMMAND ----------
 
 
 # Option 1: with Python
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {function_name}(year_built BIGINT)
+        CREATE OR REPLACE FUNCTION {function_name}(year BIGINT)
         RETURNS INT
         LANGUAGE PYTHON AS
         $$
         from datetime import datetime
-        return datetime.now().year - year_built
+        return datetime.now().year - year
         $$
         """)
 
@@ -151,32 +163,33 @@ spark.sql(f"""
 # it is possible to define simple functions in sql only without python
 # Option 2
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {function_name}_sql (year_built BIGINT)
+        CREATE OR REPLACE FUNCTION {function_name}_sql (year BIGINT)
         RETURNS INT
-        RETURN year(current_date()) - year_built;
+        RETURN year(current_date()) - year;
         """)
 
 # COMMAND ----------
 
 # execute function
-spark.sql(f"SELECT {function_name}_sql(1960) as house_age;")
+spark.sql(f"SELECT {function_name}_sql(1960) as years_from_tournament;")
 
 # COMMAND ----------
 
-# create a training set
+# create a training set 
+# Basically there is some main dataset and I'm adding more features to it. Here it's dummy version where I just drop the later added columns from the main dataset.
 training_set = fe.create_training_set(
-    df=train_set.drop("OverallQual", "GrLivArea", "GarageCars"),
-    label=config.target,
+    df=clean_set.drop("tourney_name", "surface", "draw_size"),
+    label=config.target_name,
     feature_lookups=[
         FeatureLookup(
             table_name=feature_table_name,
-            feature_names=["OverallQual", "GrLivArea", "GarageCars"],
-            lookup_key="Id",
+            feature_names=["tourney_name", "surface", "draw_size"],
+            lookup_key=["tourney_id", "match_num", "year"],
                 ),
         FeatureFunction(
             udf_name=function_name,
-            output_name="house_age",
-            input_bindings={"year_built": "YearBuilt"},
+            output_name="years_from_tournament",
+            input_bindings={"year": "year"},
             ),
     ],
     exclude_columns=["update_timestamp_utc"],
@@ -185,33 +198,41 @@ training_set = fe.create_training_set(
 # COMMAND ----------
 
 # Train & register a model
-training_df = training_set.load_df().toPandas()
-X_train = training_df[config.num_features + config.cat_features + ["house_age"]]
-y_train = training_df[config.target]
+clean_features_df = training_set.load_df().toPandas()
+clean_features_df.display()
 
 # COMMAND ----------
 
+X_train = clean_features_df[["p1_ht", "p1_age"]]
+y_train = clean_features_df[config.target_name]
+
+# COMMAND ----------
+
+X_train.display()
+
+# COMMAND ----------
+
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+
 pipeline = Pipeline(
-        steps=[("preprocessor", ColumnTransformer(
-            transformers=[("cat", OneHotEncoder(handle_unknown="ignore"),
-                           config.cat_features)],
-            remainder="passthrough")
-            ),
-               ("regressor", LGBMRegressor(**config.parameters))]
-        )
+            steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**config.parameters))]
+        )  
 
 pipeline.fit(X_train, y_train)
 
 # COMMAND ----------
 
-mlflow.set_experiment("/Shared/demo-model-fe")
-with mlflow.start_run(run_name="demo-run-model-fe",
+# Logging model with Feature Engineering client so that the model can access the features from the features table.
+# TODO Question: Can I modify my predict() method here like with Wrapper in custom model?
+mlflow.set_experiment("/Shared/tennis-model-fe")
+with mlflow.start_run(run_name="tennis-run-model-fe",
                       tags={"git_sha": "1234567890abcd",
                             "branch": "week2"},
                             description="demo run for FE model logging") as run:
     # Log parameters and metrics
     run_id = run.info.run_id
-    mlflow.log_param("model_type", "LightGBM with preprocessing")
+    mlflow.log_param("model_type", "XGBoost with scaling")
     mlflow.log_params(config.parameters)
 
     # Log the model
@@ -219,7 +240,7 @@ with mlflow.start_run(run_name="demo-run-model-fe",
     fe.log_model(
                 model=pipeline,
                 flavor=mlflow.sklearn,
-                artifact_path="lightgbm-pipeline-model-fe",
+                artifact_path="xgboost-pipeline-model-fe",
                 training_set=training_set,
                 signature=signature,
             )
@@ -227,19 +248,36 @@ with mlflow.start_run(run_name="demo-run-model-fe",
 
 # COMMAND ----------
 
+# Train & register a model
+training_df = training_set.load_df().toPandas()
+X_train = training_df[config.num_features + config.cat_features + ["house_age"]]
+y_train = training_df[config.target]
+
+#pipeline
+
+pipeline = Pipeline(
+            steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**config.parameters))]
+        )  
+
+pipeline.fit(X_train, y_train)
+
+# COMMAND ----------
+
 model_name = f"{config.catalog_name}.{config.schema_name}.model_fe_demo"
 model_version = mlflow.register_model(
-    model_uri=f'runs:/{run_id}/lightgbm-pipeline-model-fe',
+    model_uri=f'runs:/{run_id}/xgboost-pipeline-model-fe',
     name=model_name,
     tags={"git_sha": "1234567890abcd"})
 
 # COMMAND ----------
 
-# make predictions
-features = [f for f in ["Id"] + config.num_features + config.cat_features if f not in lookup_features]
+# make predictions (on "training" or clean data - same I used for training the model.)
+#"tourney_name", "surface", "draw_size" -> lookup_features that are in my feature table.
+test_set = clean_set.drop("tourney_name", "surface", "draw_size", "RESULT")
+
 predictions = fe.score_batch(
     model_uri=f"models:/{model_name}/{model_version.version}",
-    df=test_set[features]
+    df=test_set
 )
 
 # COMMAND ----------
@@ -248,13 +286,22 @@ predictions.select("prediction").show(5)
 
 # COMMAND ----------
 
-from pyspark.sql.functions import col
+test_set.display()
 
-features = [f for f in ["Id"] + config.num_features + config.cat_features if f not in lookup_features]
-test_set_with_new_id = test_set.select(*features).withColumn(
-    "Id",
-    (col("Id").cast("long") + 1000000).cast("string")
-)
+# COMMAND ----------
+
+# Does this mean that if I modify the primary key in test set, will they no longer be present in the feature table?
+# Yes.
+# When creating a training set you took: clean data + features from feature table looked after using primary keys.
+# So they keys need to be the same in clean data and features table. 
+# If keys change, the features can't be found and are set as None.
+from pyspark.sql.functions import col, lit
+
+test_set_with_new_id = test_set.withColumn("year", col("year") + 1000000)
+test_set_with_new_id = test_set_with_new_id.withColumn("match_num", col("match_num") + 1000000)
+test_set_with_new_id = test_set_with_new_id.withColumn("tourney_id", lit("hehe"))
+
+display(test_set_with_new_id)
 
 predictions = fe.score_batch(
     model_uri=f"models:/{model_name}/{model_version.version}",
@@ -263,7 +310,7 @@ predictions = fe.score_batch(
 
 # COMMAND ----------
 
-# make predictions for a non-existing entry -> error!
+# make predictions for a non-existing entry -> error! It might work for me as training data is the test data.
 predictions.select("prediction").show(5)
 
 # COMMAND ----------
@@ -356,25 +403,6 @@ training_set = fe.create_training_set(
     ],
     exclude_columns=["update_timestamp_utc"],
     )
-
-# COMMAND ----------
-
-# Train & register a model
-training_df = training_set.load_df().toPandas()
-X_train = training_df[config.num_features + config.cat_features + ["house_age"]]
-y_train = training_df[config.target]
-
-#pipeline
-pipeline = Pipeline(
-        steps=[("preprocessor", ColumnTransformer(
-            transformers=[("cat", OneHotEncoder(handle_unknown="ignore"),
-                           config.cat_features)],
-            remainder="passthrough")
-            ),
-               ("regressor", LGBMRegressor(**config.parameters))]
-        )
-
-pipeline.fit(X_train, y_train)
 
 # COMMAND ----------
 
