@@ -1,9 +1,16 @@
 # Databricks notebook source
-# MAGIC %pip install house_price-1.0.1-py3-none-any.whl
+# MAGIC %pip install -e ..
+# MAGIC %pip install git+https://github.com/end-to-end-mlops-databricks-3/marvelous@0.1.0
 
 # COMMAND ----------
 
 # MAGIC %restart_python
+
+# COMMAND ----------
+
+from pathlib import Path
+import sys
+sys.path.append(str(Path.cwd().parent / 'src'))
 
 # COMMAND ----------
 
@@ -19,7 +26,7 @@ from tennis.models.feature_lookup_model import FeatureLookUpModel
 # mlflow.set_registry_uri("databricks-uc")
 
 spark = SparkSession.builder.getOrCreate()
-tags_dict = {"git_sha": "abcd12345", "branch": "week3"}
+tags_dict = {"git_sha": "abcd12345", "branch": "week3", "job_run_id": "123"}
 tags = Tags(**tags_dict)
 
 config = ProjectConfig.from_yaml(config_path="../project_config.yml")
@@ -57,7 +64,7 @@ fe_model.train()
 
 # COMMAND ----------
 
-# Train the model
+# Register the model
 fe_model.register_model()
 
 # COMMAND ----------
@@ -69,17 +76,7 @@ spark = SparkSession.builder.getOrCreate()
 test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set").limit(10)
 
 # Drop feature lookup columns and target
-X_test = test_set.drop("AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF", config.target)
-
-
-# COMMAND ----------
-
-
-# X_test = X_test.withColumn("LotArea", col("LotArea").cast("int")) \
-#        .withColumn("OverallCond", col("OverallCond").cast("int")) \
-#        .withColumn("YearBuilt", col("YearBuilt").cast("int")) \
-#        .withColumn("YearRemodAdd", col("YearRemodAdd").cast("int")) \
-#        .withColumn("TotalBsmtSF", col("TotalBsmtSF").cast("int"))
+X_test = test_set.drop("AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF", config.target_name)
 
 
 # COMMAND ----------
@@ -93,3 +90,5 @@ predictions = fe_model.load_latest_model_and_predict(X_test)
 logger.info(predictions)
 
 # COMMAND ----------
+
+display(predictions)
