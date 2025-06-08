@@ -64,38 +64,34 @@ config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="dev")
 spark = SparkSession.builder.getOrCreate()
 fe = feature_engineering.FeatureEngineeringClient()
 
-# train_set = spark.table(f"{config.catalog_name}.{config.schema_name}.train_set")
-# test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set")
-
-# I'm using another table as it has a column that I can use as primary key.
-
-clean_set = spark.table(f"{config.catalog_name}.{config.schema_name}.clean_data")
+train_set = spark.table(f"{config.catalog_name}.{config.schema_name}.train_set")
+test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set")
 
 # COMMAND ----------
 
 # create feature table with information about houses
 
 feature_table_name = f"{config.catalog_name}.{config.schema_name}.tennis_features_demo"
-lookup_features = ["tourney_name", "surface", "draw_size"]
+lookup_features = ["AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"]
 
 
 # COMMAND ----------
 
-# Option 1: feature engineering client
+# Option 1: feature engineering client <- This should be completed during preprocessing, before splitting to test & train.
 feature_table = fe.create_table(
    name=feature_table_name,
-   primary_keys=["tourney_id", "match_num", "year"],
-   df=clean_set[["tourney_id", "match_num", "year"]+lookup_features],
+   primary_keys=["Id"],
+   df=train_set[["Id"]+lookup_features],
    description="Tennis features table",
 )
 
 spark.sql(f"ALTER TABLE {feature_table_name} SET TBLPROPERTIES (delta.enableChangeDataFeed = true)")
 
-# fe.write_table(
-#    name=feature_table_name,
-#    df=test_set[["Id"]+lookup_features],
-#    mode="merge",
-# )
+fe.write_table(
+   name=feature_table_name,
+   df=test_set[["Id"]+lookup_features],
+   mode="merge",
+)
 
 # COMMAND ----------
 
@@ -105,13 +101,11 @@ spark.sql(f"ALTER TABLE {feature_table_name} SET TBLPROPERTIES (delta.enableChan
 feature_table_name_sql = f"{config.catalog_name}.{config.schema_name}.tennis_features_demo_sql"
 
 spark.sql(f"""
-          CREATE OR REPLACE TABLE {feature_table_name}
-          (tourney_id STRING NOT NULL, 
-          match_num INT NOT NULL, 
-          year INT NOT NULL, 
-          tourney_name STRING NOT NULL, 
-          surface STRING NOT NULL, 
-          draw_size STRING NOT NULL);
+          CREATE OR REPLACE TABLE {feature_table_name_sql}
+          ( Id STRING NOT NULL,
+            AGE_DIFF INT NOT NULL, 
+            DRAW_SIZE INT NOT NULL, 
+            ATP_POINTS_DIFF INT NOT NULL);
           """)
 # primary key on Databricks is not enforced!
 try:
@@ -121,14 +115,14 @@ except AnalysisException:
 spark.sql(f"ALTER TABLE {feature_table_name_sql} SET TBLPROPERTIES (delta.enableChangeDataFeed = true);")
 spark.sql(f"""
           INSERT INTO {feature_table_name_sql}
-          SELECT tourney_id, match_num, year, tourney_name, surface, draw_size
-          FROM {config.catalog_name}.{config.schema_name}.clean_data
+          SELECT Id, AGE_DIFF, DRAW_SIZE, ATP_POINTS_DIFF
+          FROM {config.catalog_name}.{config.schema_name}.train_set
           """)
-# spark.sql(f"""
-#           INSERT INTO {feature_table_name_sql}
-#           SELECT Id, OverallQual, GrLivArea, GarageCars
-#           FROM {config.catalog_name}.{config.schema_name}.test_set
-#           """)
+spark.sql(f"""
+          INSERT INTO {feature_table_name_sql}
+          SELECT Id, AGE_DIFF, DRAW_SIZE, ATP_POINTS_DIFF
+          FROM {config.catalog_name}.{config.schema_name}.test_set
+          """)
 
 # COMMAND ----------
 
@@ -142,19 +136,18 @@ spark.sql(f"""
 # this is only supported from runtime 17
 # advised to use only for simple calculations
 
-function_name = f"{config.catalog_name}.{config.schema_name}.calculate_years_from_tournament_demo"
+function_name = f"{config.catalog_name}.{config.schema_name}.calculate_age_diff_in_months"
 
 # COMMAND ----------
 
 
 # Option 1: with Python
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {function_name}(year BIGINT)
+        CREATE OR REPLACE FUNCTION {function_name}(age_diff DOUBLE)
         RETURNS INT
         LANGUAGE PYTHON AS
         $$
-        from datetime import datetime
-        return datetime.now().year - year
+        return age_diff * 12
         $$
         """)
 
@@ -163,33 +156,33 @@ spark.sql(f"""
 # it is possible to define simple functions in sql only without python
 # Option 2
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {function_name}_sql (year BIGINT)
+        CREATE OR REPLACE FUNCTION {function_name}_sql (age_diff DOUBLE)
         RETURNS INT
-        RETURN year(current_date()) - year;
+        RETURN age_diff * 12;
         """)
 
 # COMMAND ----------
 
 # execute function
-spark.sql(f"SELECT {function_name}_sql(1960) as years_from_tournament;")
+spark.sql(f"SELECT {function_name}_sql(1) as age_diff_in_months;")
 
 # COMMAND ----------
 
 # create a training set 
 # Basically there is some main dataset and I'm adding more features to it. Here it's dummy version where I just drop the later added columns from the main dataset.
 training_set = fe.create_training_set(
-    df=clean_set.drop("tourney_name", "surface", "draw_size"),
+    df=train_set.drop("AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"),
     label=config.target_name,
     feature_lookups=[
         FeatureLookup(
             table_name=feature_table_name,
-            feature_names=["tourney_name", "surface", "draw_size"],
-            lookup_key=["tourney_id", "match_num", "year"],
+            feature_names=["AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"],
+            lookup_key=["Id"],
                 ),
         FeatureFunction(
             udf_name=function_name,
-            output_name="years_from_tournament",
-            input_bindings={"year": "year"},
+            output_name="age_diff_in_months",
+            input_bindings={"age_diff": "AGE_DIFF"},
             ),
     ],
     exclude_columns=["update_timestamp_utc"],
@@ -198,17 +191,13 @@ training_set = fe.create_training_set(
 # COMMAND ----------
 
 # Train & register a model
-clean_features_df = training_set.load_df().toPandas()
-clean_features_df.display()
+training_df = training_set.load_df().toPandas()
+training_df.display()
 
 # COMMAND ----------
 
-X_train = clean_features_df[["p1_ht", "p1_age"]]
-y_train = clean_features_df[config.target_name]
-
-# COMMAND ----------
-
-X_train.display()
+X_train = training_df[config.features + ["age_diff_in_months"]]
+y_train = training_df[config.target_name]
 
 # COMMAND ----------
 
@@ -228,7 +217,7 @@ pipeline.fit(X_train, y_train)
 mlflow.set_experiment("/Shared/tennis-model-fe")
 with mlflow.start_run(run_name="tennis-run-model-fe",
                       tags={"git_sha": "1234567890abcd",
-                            "branch": "week2"},
+                            "branch": "week3"},
                             description="demo run for FE model logging") as run:
     # Log parameters and metrics
     run_id = run.info.run_id
@@ -248,21 +237,6 @@ with mlflow.start_run(run_name="tennis-run-model-fe",
 
 # COMMAND ----------
 
-# Train & register a model
-training_df = training_set.load_df().toPandas()
-X_train = training_df[config.num_features + config.cat_features + ["house_age"]]
-y_train = training_df[config.target]
-
-#pipeline
-
-pipeline = Pipeline(
-            steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**config.parameters))]
-        )  
-
-pipeline.fit(X_train, y_train)
-
-# COMMAND ----------
-
 model_name = f"{config.catalog_name}.{config.schema_name}.model_fe_demo"
 model_version = mlflow.register_model(
     model_uri=f'runs:/{run_id}/xgboost-pipeline-model-fe',
@@ -271,13 +245,14 @@ model_version = mlflow.register_model(
 
 # COMMAND ----------
 
-# make predictions (on "training" or clean data - same I used for training the model.)
-#"tourney_name", "surface", "draw_size" -> lookup_features that are in my feature table.
-test_set = clean_set.drop("tourney_name", "surface", "draw_size", "RESULT")
+# make predictions
+# Does this model add features from feature table to the test data by Id?
+
+features = [f for f in ["Id"] + config.features if f not in lookup_features]
 
 predictions = fe.score_batch(
     model_uri=f"models:/{model_name}/{model_version.version}",
-    df=test_set
+    df=test_set[features]
 )
 
 # COMMAND ----------
@@ -286,22 +261,20 @@ predictions.select("prediction").show(5)
 
 # COMMAND ----------
 
-test_set.display()
-
-# COMMAND ----------
-
 # Does this mean that if I modify the primary key in test set, will they no longer be present in the feature table?
 # Yes.
-# When creating a training set you took: clean data + features from feature table looked after using primary keys.
-# So they keys need to be the same in clean data and features table. 
+# When creating a training set you took: train data + features from feature table looked after using primary keys.
+# So the keys need to be the same in train data and features table. 
 # If keys change, the features can't be found and are set as None.
-from pyspark.sql.functions import col, lit
 
-test_set_with_new_id = test_set.withColumn("year", col("year") + 1000000)
-test_set_with_new_id = test_set_with_new_id.withColumn("match_num", col("match_num") + 1000000)
-test_set_with_new_id = test_set_with_new_id.withColumn("tourney_id", lit("hehe"))
+# -- Actually I think now it can't find the "helper" data for test data. To what extent is that practical in online deployments? For example, if user submits a request, how can it be ID-ed?
+from pyspark.sql.functions import col
 
-display(test_set_with_new_id)
+features = [f for f in ["Id"] + config.features if f not in lookup_features]
+test_set_with_new_id = test_set.select(*features).withColumn(
+    "Id",
+    (col("Id").cast("long") + 1000000).cast("string")
+)
 
 predictions = fe.score_batch(
     model_uri=f"models:/{model_name}/{model_version.version}",
@@ -310,47 +283,49 @@ predictions = fe.score_batch(
 
 # COMMAND ----------
 
-# make predictions for a non-existing entry -> error! It might work for me as training data is the test data.
+# make predictions for a non-existing entry -> error!
+# So it couldn't find the supportive features for test set, as I changed the test set Ids.
 predictions.select("prediction").show(5)
 
 # COMMAND ----------
 
-overallqual_function = f"{config.catalog_name}.{config.schema_name}.replace_overallqual_missing"
+#"AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"
+no_age_diff_function = f"{config.catalog_name}.{config.schema_name}.replace_age_diff"
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {overallqual_function}(OverallQual INT)
-        RETURNS INT
+        CREATE OR REPLACE FUNCTION {no_age_diff_function}(age_diff DOUBLE)
+        RETURNS DOUBLE
         LANGUAGE PYTHON AS
         $$
-        if OverallQual is None:
+        if age_diff is None:
             return 5
         else:
-            return OverallQual
+            return age_diff
         $$
         """)
 
-grlivarea_function = f"{config.catalog_name}.{config.schema_name}.replace_grlivarea_missing"
+no_draw_size_function = f"{config.catalog_name}.{config.schema_name}.replace_draw_size"
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {grlivarea_function}(GrLivArea INT)
-        RETURNS INT
+        CREATE OR REPLACE FUNCTION {no_draw_size_function}(draw_size BIGINT)
+        RETURNS BIGINT
         LANGUAGE PYTHON AS
         $$
-        if GrLivArea is None:
-            return 1000
+        if draw_size is None:
+            return 8
         else:
-            return GrLivArea
+            return draw_size
         $$
         """)
 
-garagecars_function = f"{config.catalog_name}.{config.schema_name}.replace_garagecars_missing"
+no_atp_points_diff_function = f"{config.catalog_name}.{config.schema_name}.replace_atp_points_diff"
 spark.sql(f"""
-        CREATE OR REPLACE FUNCTION {garagecars_function}(GarageCars INT)
-        RETURNS INT
+        CREATE OR REPLACE FUNCTION {no_atp_points_diff_function}(atp_points_diff DOUBLE)
+        RETURNS DOUBLE
         LANGUAGE PYTHON AS
         $$
-        if GarageCars is None:
-            return 2
+        if atp_points_diff is None:
+            return 500
         else:
-            return GarageCars
+            return atp_points_diff
         $$
         """)
 
@@ -358,7 +333,7 @@ spark.sql(f"""
 
 # what if we want to replace with a default value if entry is not found
 # what if we want to look up value in another table? the logics get complex
-# problems that arize: functions/ lookups always get executed (if statememt is not possible)
+# problems that arize: functions/ lookups always get executed (if statement is not possible)
 # it can get slow...
 
 # step 1: create 3 feature functions
@@ -369,36 +344,36 @@ spark.sql(f"""
 
 # create a training set
 training_set = fe.create_training_set(
-    df=train_set.drop("OverallQual", "GrLivArea", "GarageCars"),
-    label=config.target,
+    df=train_set.drop("AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"),
+    label=config.target_name,
     feature_lookups=[
         FeatureLookup(
             table_name=feature_table_name,
-            feature_names=["OverallQual", "GrLivArea", "GarageCars"],
+            feature_names=["AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"],
             lookup_key="Id",
-            rename_outputs={"OverallQual": "lookup_OverallQual",
-                            "GrLivArea": "lookup_GrLivArea",
-                            "GarageCars": "lookup_GarageCars"}
+            rename_outputs={"AGE_DIFF": "lookup_AGE_DIFF",
+                            "DRAW_SIZE": "lookup_DRAW_SIZE",
+                            "ATP_POINTS_DIFF": "lookup_ATP_POINTS_DIFF"}
                 ),
         FeatureFunction(
-            udf_name=overallqual_function,
-            output_name="OverallQual",
-            input_bindings={"OverallQual": "lookup_OverallQual"},
+            udf_name=no_age_diff_function,
+            output_name="AGE_DIFF",
+            input_bindings={"age_diff": "lookup_AGE_DIFF"},
             ),
         FeatureFunction(
-            udf_name=grlivarea_function,
-            output_name="GrLivArea",
-            input_bindings={"GrLivArea": "lookup_GrLivArea"},
+            udf_name=no_draw_size_function,
+            output_name="DRAW_SIZE",
+            input_bindings={"draw_size": "lookup_DRAW_SIZE"},
         ),
         FeatureFunction(
-            udf_name=garagecars_function,
-            output_name="GarageCars",
-            input_bindings={"GarageCars": "lookup_GarageCars"},
+            udf_name=no_atp_points_diff_function,
+            output_name="ATP_POINTS_DIFF",
+            input_bindings={"atp_points_diff": "lookup_ATP_POINTS_DIFF"},
         ),
         FeatureFunction(
             udf_name=function_name,
-            output_name="house_age",
-            input_bindings={"year_built": "YearBuilt"},
+            output_name="age_diff_in_months",
+            input_bindings={"age_diff": "AGE_DIFF"},
             ),
     ],
     exclude_columns=["update_timestamp_utc"],
@@ -409,11 +384,11 @@ training_set = fe.create_training_set(
 mlflow.set_experiment("/Shared/demo-model-fe")
 with mlflow.start_run(run_name="demo-run-model-fe",
                       tags={"git_sha": "1234567890abcd",
-                            "branch": "week2"},
+                            "branch": "week3"},
                             description="demo run for FE model logging") as run:
     # Log parameters and metrics
     run_id = run.info.run_id
-    mlflow.log_param("model_type", "LightGBM with preprocessing")
+    mlflow.log_param("model_type", "XGBoost with scaling")
     mlflow.log_params(config.parameters)
 
     # Log the model
@@ -421,13 +396,13 @@ with mlflow.start_run(run_name="demo-run-model-fe",
     fe.log_model(
                 model=pipeline,
                 flavor=mlflow.sklearn,
-                artifact_path="lightgbm-pipeline-model-fe",
+                artifact_path="xgboost-pipeline-model-fe",
                 training_set=training_set,
                 signature=signature,
             )
 model_name = f"{config.catalog_name}.{config.schema_name}.model_fe_demo"
 model_version = mlflow.register_model(
-    model_uri=f'runs:/{run_id}/lightgbm-pipeline-model-fe',
+    model_uri=f'runs:/{run_id}/xgboost-pipeline-model-fe',
     name=model_name,
     tags={"git_sha": "1234567890abcd"})
 
@@ -435,7 +410,7 @@ model_version = mlflow.register_model(
 
 from pyspark.sql.functions import col
 
-features = [f for f in ["Id"] + config.num_features + config.cat_features if f not in lookup_features]
+features = [f for f in ["Id"] + config.features if f not in lookup_features]
 test_set_with_new_id = test_set.select(*features).withColumn(
     "Id",
     (col("Id").cast("long") + 1000000).cast("string")
@@ -454,6 +429,7 @@ predictions.select("prediction").show(5)
 # COMMAND ----------
 
 import boto3
+import os
 
 region_name = "eu-west-1"
 aws_access_key_id = os.environ["aws_access_key_id"]
@@ -469,7 +445,7 @@ client = boto3.client(
 # COMMAND ----------
 
 response = client.create_table(
-    TableName='HouseFeatures',
+    TableName='TennisFeatures',
     KeySchema=[
         {
             'AttributeName': 'Id',
@@ -493,21 +469,21 @@ print("Table creation initiated:", response['TableDescription']['TableName'])
 # COMMAND ----------
 
 client.put_item(
-    TableName='HouseFeatures',
+    TableName='TennisFeatures',
     Item={
-        'Id': {'S': 'house_001'},
-        'OverallQual': {'N': '8'},
-        'GrLivArea': {'N': '2450'},
-        'GarageCars': {'N': '2'}
+        'Id': {'S': '121212'},
+        'AGE_DIFF': {'N': '8'},
+        'DRAW_SIZE': {'N': '4'},
+        'ATP_POINTS_DIFF': {'N': '200'}
     }
 )
 
 # COMMAND ----------
 
 response = client.get_item(
-    TableName='HouseFeatures',
+    TableName='TennisFeatures',
     Key={
-        'Id': {'S': 'house_001'}
+        'Id': {'S': '121212'}
     }
 )
 
@@ -519,6 +495,8 @@ print(item)
 
 from itertools import islice
 
+feature_table_name = f"{config.catalog_name}.{config.schema_name}.tennis_features_demo"
+
 rows = spark.table(feature_table_name).toPandas().to_dict(orient="records")
 
 def to_dynamodb_item(row):
@@ -526,9 +504,9 @@ def to_dynamodb_item(row):
         'PutRequest': {
             'Item': {
                 'Id': {'S': str(row['Id'])},
-                'OverallQual': {'N': str(row['OverallQual'])},
-                'GrLivArea': {'N': str(row['GrLivArea'])},
-                'GarageCars': {'N': str(row['GarageCars'])}
+                'AGE_DIFF': {'N': str(row['AGE_DIFF'])},
+                'DRAW_SIZE': {'N': str(row['DRAW_SIZE'])},
+                'ATP_POINTS_DIFF': {'N': str(row['ATP_POINTS_DIFF'])}
             }
         }
     }
@@ -543,7 +521,7 @@ def chunks(lst, n):
 for batch in chunks(items, 25):
     response = client.batch_write_item(
         RequestItems={
-            'HouseFeatures': batch
+            'TennisFeatures': batch
         }
     )
     # Handle any unprocessed items if needed
@@ -565,14 +543,14 @@ for batch in chunks(items, 25):
 # COMMAND ----------
 
 
-class HousePriceModelWrapper(mlflow.pyfunc.PythonModel):
+class TennisModelWrapper(mlflow.pyfunc.PythonModel):
     """Wrapper class for machine learning models to be used with MLflow.
 
-    This class wraps a machine learning model for predicting house prices.
+    This class wraps a machine learning model for predicting tennis matches.
     """
 
     def __init__(self, model: object) -> None:
-        """Initialize the HousePriceModelWrapper.
+        """Initialize the TennisModelWrapper.
 
         :param model: The underlying machine learning model.
         """
@@ -595,34 +573,51 @@ class HousePriceModelWrapper(mlflow.pyfunc.PythonModel):
         parsed = []
         for lookup_id in model_input["Id"]:
             raw_item = client.get_item(
-                TableName='HouseFeatures',
+                TableName='TennisFeatures',
                 Key={'Id': {'S': lookup_id}})["Item"]
-            parsed_dict = {key: int(value['N']) if 'N' in value else value['S']
+            parsed_dict = {key: float(value['N']) if 'N' in value else value['S']
                       for key, value in raw_item.items()}
             parsed.append(parsed_dict)
         lookup_df=pd.DataFrame(parsed)
         merged_df = model_input.merge(lookup_df, on="Id", how="left").drop("Id", axis=1)
 
-        merged_df["GarageCars"] = merged_df["GarageCars"].fillna(2)
-        merged_df["GrLivArea"] = merged_df["GrLivArea"].fillna(1000)
-        merged_df["OverallQual"] = merged_df["OverallQual"].fillna(5)
-        merged_df["house_age"] = datetime.now().year - merged_df["YearBuilt"]
+        merged_df["AGE_DIFF"] = merged_df["AGE_DIFF"].fillna(2)
+        merged_df["DRAW_SIZE"] = merged_df["DRAW_SIZE"].fillna(8)
+        merged_df["ATP_POINTS_DIFF"] = merged_df["ATP_POINTS_DIFF"].fillna(200)
+        merged_df["age_diff_in_months"] = merged_df["AGE_DIFF"] * 12
         predictions = self.model.predict(merged_df)
 
-        return [int(x) for x in predictions]
+        return [float(x) for x in predictions]
 
 # COMMAND ----------
 
-custom_model = HousePriceModelWrapper(pipeline)
+from sklearn.preprocessing import StandardScaler
+from xgboost import XGBClassifier
+
+pipeline = Pipeline(
+            steps=[("scaler", StandardScaler()), ("classifier", XGBClassifier(**config.parameters))]
+        )  
+
+pipeline.fit(X_train, y_train)
 
 # COMMAND ----------
 
-features = [f for f in ["Id"] + config.num_features + config.cat_features if f not in lookup_features]
+custom_model = TennisModelWrapper(pipeline)
+
+# COMMAND ----------
+
+features = [f for f in ["Id"] + config.features if f not in lookup_features]
 data = test_set.select(*features).toPandas()
 data
 
 # COMMAND ----------
 
+X_train
+
+# COMMAND ----------
+
+# Reorder by listing columns in desired order
+# data = data[["AGE_DIFF", "ATP_POINTS_DIFF", "ATP_RANK_DIFF", "BEST_OF", "DRAW_SIZE", "ELO_DIFF", "ELO_GRAD_LAST_100_DIFF", "ELO_GRAD_LAST_10_DIFF", "ELO_GRAD_LAST_200_DIFF", "ELO_GRAD_LAST_25_DIFF", "ELO_GRAD_LAST_3_DIFF", "ELO_GRAD_LAST_50_DIFF", "ELO_GRAD_LAST_5_DIFF", "ELO_SURFACE_DIFF", "H2H_DIFF", "H2H_SURFACE_DIFF", "HEIGHT_DIFF", "N_GAMES_DIFF", "P_1ST_IN_LAST_100_DIFF", "P_1ST_IN_LAST_10_DIFF", "P_1ST_IN_LAST_200_DIFF", "P_1ST_IN_LAST_25_DIFF", "P_1ST_IN_LAST_3_DIFF", "P_1ST_IN_LAST_50_DIFF", "P_1ST_IN_LAST_5_DIFF", "P_1ST_WON_LAST_100_DIFF", "P_1ST_WON_LAST_10_DIFF", "P_1ST_WON_LAST_200_DIFF", "P_1ST_WON_LAST_25_DIFF", "P_1ST_WON_LAST_3_DIFF", "P_1ST_WON_LAST_50_DIFF", "P_1ST_WON_LAST_5_DIFF", "P_2ND_WON_LAST_100_DIFF", "P_2ND_WON_LAST_10_DIFF", "P_2ND_WON_LAST_200_DIFF", "P_2ND_WON_LAST_25_DIFF", "P_2ND_WON_LAST_3_DIFF", "P_2ND_WON_LAST_50_DIFF", "P_2ND_WON_LAST_5_DIFF", "P_ACE_LAST_100_DIFF", "P_ACE_LAST_10_DIFF", "P_ACE_LAST_200_DIFF", "P_ACE_LAST_25_DIFF", "P_ACE_LAST_3_DIFF", "P_ACE_LAST_50_DIFF", "P_ACE_LAST_5_DIFF", "P_BP_SAVED_LAST_100_DIFF", "P_BP_SAVED_LAST_10_DIFF", "P_BP_SAVED_LAST_200_DIFF", "P_BP_SAVED_LAST_25_DIFF", "P_BP_SAVED_LAST_3_DIFF", "P_BP_SAVED_LAST_50_DIFF", "P_BP_SAVED_LAST_5_DIFF", "P_DF_LAST_100_DIFF", "P_DF_LAST_10_DIFF", "P_DF_LAST_200_DIFF", "P_DF_LAST_25_DIFF", "P_DF_LAST_3_DIFF", "P_DF_LAST_50_DIFF", "P_DF_LAST_5_DIFF", "WIN_LAST_100_DIFF", "WIN_LAST_10_DIFF", "WIN_LAST_200_DIFF", "WIN_LAST_25_DIFF", "WIN_LAST_3_DIFF", "WIN_LAST_50_DIFF", "WIN_LAST_5_DIFF", "age_diff_in_months"]]
 custom_model.predict(context=None, model_input=data)
 
 # COMMAND ----------

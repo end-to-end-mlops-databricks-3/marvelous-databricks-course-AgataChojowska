@@ -112,6 +112,8 @@ tables:
   train: train_set
   test: test_set
 
+experiment_name_fe: /Shared/tennis-fe
+
 features:
   - AGE_DIFF
   - ATP_POINTS_DIFF

@@ -44,6 +44,7 @@ class ProjectConfig(BaseModel):
     target_name: str
     features: list[str]
     primary_key_cols: list[str]
+    experiment_name_fe: str
 
     @classmethod
     def from_yaml(cls, config_path: str, env: str = "dev") -> "ProjectConfig":
