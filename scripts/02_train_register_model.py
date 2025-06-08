@@ -99,7 +99,7 @@ def predict(config: ProjectConfig, spark: SparkSession, custom_model: TennisMode
     match = {
         "BEST_OF": 3,  # Set this to 5 if grand slam, otherwise 3 normally
         "DRAW_SIZE": 128,  # Depending on the tournament
-        "SURFACE": "Clay",  # Surface of the match. Options are ("Hard", "Clay", "Grass", "Carpet")
+        "SURFACE": "Hard",  # Surface of the match. Options are ("Hard", "Clay", "Grass", "Carpet")
     }
     stats = StatsCalculator()
     clean_data = load_from_table_to_pandas(spark=spark, config=config, table=config.tables.silver).drop(
