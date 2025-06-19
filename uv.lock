@@ -2040,7 +2040,7 @@ wheels = [
 ]
 
 [[package]]
-name = "tennis"
+name = "tennisprediction"
 source = { editable = "." }
 dependencies = [
     { name = "cffi" },

@@ -22,8 +22,8 @@ import requests
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig
-from tennis.serving.model_serving import ModelServing
+from tennisprediction.config import ProjectConfig
+from tennisprediction.serving.model_serving import ModelServing
 
 # spark session
 

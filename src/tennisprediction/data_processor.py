@@ -7,7 +7,7 @@ import pandas as pd
 from loguru import logger
 from sklearn.model_selection import train_test_split
 
-from tennis.config import ProjectConfig
+from tennisprediction.config import ProjectConfig
 
 
 class DataProcessor:

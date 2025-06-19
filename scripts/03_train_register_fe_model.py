@@ -18,8 +18,8 @@ sys.path.append(str(Path.cwd().parent / 'src'))
 from loguru import logger
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig, Tags
-from tennis.models.feature_lookup_model import FeatureLookUpModel
+from tennisprediction.config import ProjectConfig, Tags
+from tennisprediction.models.feature_lookup_model import FeatureLookUpModel
 
 # Configure tracking uri
 # mlflow.set_tracking_uri("databricks")

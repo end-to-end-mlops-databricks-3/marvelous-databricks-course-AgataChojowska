@@ -5,8 +5,8 @@ import pytest
 from loguru import logger
 from pyspark.sql import SparkSession
 
-from tennis import PROJECT_DIR
-from tennis.config import ProjectConfig, Tags
+from tennisprediction import PROJECT_DIR
+from tennisprediction.config import ProjectConfig, Tags
 from tests.unit_tests.spark_config import spark_config
 
 

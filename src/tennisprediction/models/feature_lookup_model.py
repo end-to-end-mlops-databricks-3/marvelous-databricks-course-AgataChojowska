@@ -13,7 +13,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from tennis.config import ProjectConfig, Tags
+from tennisprediction.config import ProjectConfig, Tags
 
 
 class FeatureLookUpModel:

@@ -27,7 +27,7 @@ from pyspark.sql import SparkSession
 import mlflow
 import dotenv
 
-from tennis.config import ProjectConfig
+from tennisprediction.config import ProjectConfig
 from sklearn.compose import ColumnTransformer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
@@ -38,7 +38,7 @@ from dotenv import load_dotenv
 import os
 from mlflow import MlflowClient
 import pandas as pd
-from tennis import __version__
+from tennisprediction import __version__
 from mlflow.utils.environment import _mlflow_conda_env
 from databricks import feature_engineering
 from databricks.feature_engineering import FeatureFunction, FeatureLookup

@@ -12,9 +12,9 @@ from conftest import CATALOG_DIR, MLRUNS_DIR
 from loguru import logger
 from pyspark.sql import SparkSession
 
-from tennis import PROJECT_DIR
-from tennis.config import ProjectConfig, Tags
-from tennis.models.custom_model import TennisModel
+from tennisprediction import PROJECT_DIR
+from tennisprediction.config import ProjectConfig, Tags
+from tennisprediction.models.custom_model import TennisModel
 
 whl_file_name = None  # Global variable to store the .whl file name
 

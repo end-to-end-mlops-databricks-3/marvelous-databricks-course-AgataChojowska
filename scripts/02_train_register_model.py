@@ -1,4 +1,4 @@
-"""Tennis match model training and registration."""
+"""Tennis model training and registration."""
 
 import argparse
 import os
@@ -11,11 +11,11 @@ from loguru import logger
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
-from tennis.catalog_utils import load_from_table_to_pandas
-from tennis.config import ProjectConfig, Tags
-from tennis.models.custom_model import TennisModel
-from tennis.runtime_utils import get_spark, running_on_databricks
-from tennis.stats_calculator import StatsCalculator
+from tennisprediction.catalog_utils import load_from_table_to_pandas
+from tennisprediction.config import ProjectConfig, Tags
+from tennisprediction.models.custom_model import TennisModel
+from tennisprediction.runtime_utils import get_spark, running_on_databricks
+from tennisprediction.stats_calculator import StatsCalculator
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -111,6 +111,9 @@ def predict(config: ProjectConfig, spark: SparkSession, custom_model: TennisMode
     match_data[["ATP_POINTS_DIFF", "ATP_RANK_DIFF", "HEIGHT_DIFF"]] = match_data[
         ["ATP_POINTS_DIFF", "ATP_RANK_DIFF", "HEIGHT_DIFF"]
     ].astype(float)
+    print("MATCH DATA")
+    print(match_data.head())
+    match_data.to_csv("match_data.csv")
 
     # Get predictions
     prob_player1_wins, prob_player2_wins = custom_model.load_latest_model_and_predict(inference_data=match_data)
@@ -143,7 +146,8 @@ def main(mode: Literal["train", "predict", "full"]) -> None:
         ["Id", "update_timestamp_utc"], axis=1
     )
     test_set = load_from_table_to_pandas(spark=spark, config=config, table="test_set").drop(
-        ["Id", "update_timestamp_utc"], axis=1
+        ["Id", "update_timestamp_utc"],
+        axis=1,  # TODO Maybe don't drop ID so that you can take the features
     )
     logger.info("Loaded tables")
 

@@ -24,8 +24,8 @@ from databricks import feature_engineering
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig
-from tennis.serving.feature_serving import FeatureServing
+from tennisprediction.config import ProjectConfig
+from tennisprediction.serving.feature_serving import FeatureServing
 
 # Load project config
 config = ProjectConfig.from_yaml(config_path="../project_config.yml")

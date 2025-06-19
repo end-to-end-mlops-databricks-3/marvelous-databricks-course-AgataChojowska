@@ -25,8 +25,8 @@ from databricks.sdk.service.serving import (
 from mlflow.models import infer_signature
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig, Tags
-from tennis.models.custom_model import TennisModel
+from tennisprediction.config import ProjectConfig, Tags
+from tennisprediction.models.custom_model import TennisModel
 from marvelous.common import is_databricks
 from dotenv import load_dotenv
 import os
@@ -54,7 +54,7 @@ catalog_name = config.catalog_name
 schema_name = config.schema_name
 
 # Load test and train data
-from tennis.catalog_utils import load_from_table_to_pandas
+from tennisprediction.catalog_utils import load_from_table_to_pandas
 
 train_set = load_from_table_to_pandas(spark=spark, config=config, table="train_set").drop(
         ["update_timestamp_utc"], axis=1

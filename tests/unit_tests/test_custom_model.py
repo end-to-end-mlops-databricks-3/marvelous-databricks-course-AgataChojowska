@@ -11,8 +11,8 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from tennis.config import ProjectConfig, Tags
-from tennis.models.custom_model import TennisModel
+from tennisprediction.config import ProjectConfig, Tags
+from tennisprediction.models.custom_model import TennisModel
 
 mlflow.set_tracking_uri(TRACKING_URI)
 

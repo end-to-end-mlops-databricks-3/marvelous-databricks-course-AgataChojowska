@@ -23,8 +23,8 @@ from loguru import logger
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig
-from tennis.serving.fe_model_serving import FeatureLookupServing
+from tennisprediction.config import ProjectConfig
+from tennisprediction.serving.fe_model_serving import FeatureLookupServing
 
 # spark session
 

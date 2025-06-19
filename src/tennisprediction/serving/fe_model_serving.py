@@ -11,7 +11,7 @@ from databricks.sdk.service.catalog import (
 from databricks.sdk.service.serving import EndpointCoreConfigInput, ServedEntityInput
 from loguru import logger
 
-from tennis.config import ProjectConfig
+from tennisprediction.config import ProjectConfig
 
 
 class FeatureLookupServing:

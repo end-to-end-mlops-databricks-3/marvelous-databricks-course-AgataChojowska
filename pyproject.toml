@@ -1,5 +1,5 @@
 [project]
-name = "tennis-prediction"
+name = "tennisprediction"
 description = "MLOps with Databricks course."
 requires-python = ">=3.11, <3.13"
 dependencies = [
@@ -51,7 +51,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where =["src"]
-include = ["tennis-prediction*"]
+include = ["tennisprediction*"]
 
 [tool.setuptools.dynamic]
 version = { file = "version.txt" }

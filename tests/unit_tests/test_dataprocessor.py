@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 from conftest import CATALOG_DIR
 
-from tennis.config import ProjectConfig
-from tennis.data_processor import DataProcessor, split_data
+from tennisprediction.config import ProjectConfig
+from tennisprediction.data_processor import DataProcessor, split_data
 
 
 def test_data_ingestion(sample_data: pd.DataFrame) -> None:

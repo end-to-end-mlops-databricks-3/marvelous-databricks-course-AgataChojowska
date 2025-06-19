@@ -8,7 +8,7 @@ from loguru import logger
 from marvelous.logging import setup_logging
 from pyspark.sql import SparkSession
 
-from tennis.config import ProjectConfig
+from tennisprediction.config import ProjectConfig
 
 
 def running_on_databricks() -> bool:

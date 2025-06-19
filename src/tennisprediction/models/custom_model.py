@@ -8,7 +8,9 @@ target → The column to predict.
 parameters → Hyperparameters for XGBoost.
 catalog_name, schema_name → Database schema names for Databricks tables.
 """
+
 from typing import Optional
+
 import mlflow
 import numpy as np
 import pandas as pd
@@ -24,7 +26,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
-from tennis.config import ProjectConfig, Tags
+from tennisprediction.config import ProjectConfig, Tags
 
 
 def adjust_predictions(predictions: pd.DataFrame) -> pd.DataFrame:
@@ -75,7 +77,7 @@ class TennisModel:
         train_set: pd.DataFrame,
         test_set: pd.DataFrame,
         model_name: Optional[str],
-        code_paths: Optional[list]=None
+        code_paths: Optional[list] = None,
     ) -> None:
         self.config = config
         self.spark = spark
@@ -111,10 +113,6 @@ class TennisModel:
         This method evaluates the model, logs parameters and metrics, and saves the model in MLflow.
         """
         mlflow.set_experiment(self.experiment_name)
-        # if self.code_paths:
-        #     for package in self.code_paths:  # Paths to custom dependencies, only file names aka wheel names.
-        #         whl_name = package.split("/")[-1]
-        #         additional_pip_deps.append(f"./code/{whl_name}")
 
         with mlflow.start_run(tags=self.tags) as run:
             self.run_id = run.info.run_id
@@ -151,13 +149,13 @@ class TennisModel:
 
             mlflow.log_input(dataset, context="training")
 
-            additional_pip_deps = ["./code/tennis-0.1.0-py3-none-any.whl"]
+            additional_pip_deps = ["./code/tennisprediction-0.0.1-py3-none-any.whl"]
             conda_env = _mlflow_conda_env(additional_pip_deps=additional_pip_deps)
 
             mlflow.pyfunc.log_model(
                 python_model=TennisModelWrapper(self.pipeline),
                 artifact_path=self.model_name,
-                code_paths=["../dist/tennis-0.1.0-py3-none-any.whl"],
+                code_paths=["../dist/tennisprediction-0.0.1-py3-none-any.whl"],
                 conda_env=conda_env,
                 signature=signature,
                 input_example=self.X_train.iloc[0:1],
@@ -169,7 +167,7 @@ class TennisModel:
         This method registers the model and sets an alias for the latest version.
         """
         logger.info("🔄 Registering the model in UC...")
-        self.model_uri=f"runs:/{self.run_id}/{self.model_name}"
+        self.model_uri = f"runs:/{self.run_id}/{self.model_name}"
         registered_model = mlflow.register_model(
             model_uri=self.model_uri,
             name=f"{self.config.catalog_name}.{self.config.schema_name}.{self.model_name}",
