@@ -123,6 +123,7 @@ def mock_custom_model(
     spark_session: SparkSession,
     train_set: pd.DataFrame,
     test_set: pd.DataFrame,
+    model_name: str,
 ) -> TennisModel:
     """Fixture that provides a TennisModel instance with mocked Spark interactions.
 
@@ -140,6 +141,7 @@ def mock_custom_model(
         code_paths=[f"{PROJECT_DIR.as_posix()}/dist/{whl_file_name}"],
         train_set=train_set,
         test_set=test_set,
+        model_name=model_name,
     )
 
     train_set = pd.read_csv((CATALOG_DIR / "train_set.csv").as_posix())

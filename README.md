@@ -1,3 +1,6 @@
+## Info from myself
+Each number of script should correspond with a different branch number. They might not be backward compatible.
+
 <h1 align="center">
 Marvelous MLOps End-to-end MLOps with Databricks course
 
