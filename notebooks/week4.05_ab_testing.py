@@ -68,7 +68,9 @@ test_set = load_from_table_to_pandas(spark=spark, config=config, table="test_set
 
 # train model A
 
-basic_model = TennisModel(config=config, tags=tags, spark=spark, train_set=train_set, test_set=test_set, model_name="tennis_model_A")
+basic_model = TennisModel(config=config, tags=tags, spark=spark, train_set=train_set, test_set=test_set, 
+                          model_name="tennis_model_A", additional_pip_deps = ["./code/tennisprediction-0.0.1-py3-none-any.whl"], 
+                          code_paths=["../dist/tennisprediction-0.0.1-py3-none-any.whl"]) # This wheel needs to be created for example with uv build.
 
 basic_model.prepare_features()
 basic_model.train()
