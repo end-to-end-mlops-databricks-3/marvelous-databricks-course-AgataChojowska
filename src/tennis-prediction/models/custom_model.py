@@ -8,7 +8,7 @@ target → The column to predict.
 parameters → Hyperparameters for XGBoost.
 catalog_name, schema_name → Database schema names for Databricks tables.
 """
-
+from typing import Optional
 import mlflow
 import numpy as np
 import pandas as pd
@@ -72,9 +72,10 @@ class TennisModel:
         config: ProjectConfig,
         spark: SparkSession,
         tags: Tags,
-        code_paths: list,
         train_set: pd.DataFrame,
         test_set: pd.DataFrame,
+        model_name: Optional[str],
+        code_paths: Optional[list]=None
     ) -> None:
         self.config = config
         self.spark = spark
@@ -85,7 +86,8 @@ class TennisModel:
         self.y_train = train_set[config.target_name]
         self.X_test = test_set[config.features]
         self.y_test = test_set[config.target_name]
-        self.parameters = self.config.parameters  #
+        self.parameters = self.config.parameters
+        self.model_name = model_name or "pyfunc-tennis-model"
 
     def prepare_features(self) -> None:
         """Prepare features for model training.
@@ -109,10 +111,10 @@ class TennisModel:
         This method evaluates the model, logs parameters and metrics, and saves the model in MLflow.
         """
         mlflow.set_experiment(self.experiment_name)
-        additional_pip_deps = ["pyspark==3.5.0"]  # Spark is used for loading data
-        for package in self.code_paths:  # Paths to custom dependencies, only file names aka wheel names.
-            whl_name = package.split("/")[-1]
-            additional_pip_deps.append(f"./code/{whl_name}")
+        # if self.code_paths:
+        #     for package in self.code_paths:  # Paths to custom dependencies, only file names aka wheel names.
+        #         whl_name = package.split("/")[-1]
+        #         additional_pip_deps.append(f"./code/{whl_name}")
 
         with mlflow.start_run(tags=self.tags) as run:
             self.run_id = run.info.run_id
@@ -149,12 +151,13 @@ class TennisModel:
 
             mlflow.log_input(dataset, context="training")
 
+            additional_pip_deps = ["./code/tennis-0.1.0-py3-none-any.whl"]
             conda_env = _mlflow_conda_env(additional_pip_deps=additional_pip_deps)
 
             mlflow.pyfunc.log_model(
                 python_model=TennisModelWrapper(self.pipeline),
-                artifact_path="pyfunc-tennis-model",
-                code_paths=self.code_paths,
+                artifact_path=self.model_name,
+                code_paths=["../dist/tennis-0.1.0-py3-none-any.whl"],
                 conda_env=conda_env,
                 signature=signature,
                 input_example=self.X_train.iloc[0:1],
@@ -166,9 +169,10 @@ class TennisModel:
         This method registers the model and sets an alias for the latest version.
         """
         logger.info("🔄 Registering the model in UC...")
+        self.model_uri=f"runs:/{self.run_id}/{self.model_name}"
         registered_model = mlflow.register_model(
-            model_uri=f"runs:/{self.run_id}/pyfunc-tennis-model",
-            name=f"{self.config.catalog_name}.{self.config.schema_name}.pyfunc-tennis-model",
+            model_uri=self.model_uri,
+            name=f"{self.config.catalog_name}.{self.config.schema_name}.{self.model_name}",
             tags=self.tags,
         )
         logger.info(f"✅ Model registered as version {registered_model.version}.")
@@ -177,7 +181,7 @@ class TennisModel:
 
         client = MlflowClient()
         client.set_registered_model_alias(
-            name=f"{self.config.catalog_name}.{self.config.schema_name}.pyfunc-tennis-model",
+            name=f"{self.config.catalog_name}.{self.config.schema_name}.{self.model_name}",
             alias="latest-model",
             version=latest_version,
         )
@@ -221,7 +225,7 @@ class TennisModel:
         """
         logger.info("🔄 Loading model from MLflow alias 'production'...")
 
-        model_uri = f"models:/{self.config.catalog_name}.{self.config.schema_name}.pyfunc-tennis-model@latest-model"
+        model_uri = f"models:/{self.config.catalog_name}.{self.config.schema_name}.{self.model_name}@latest-model"
         model = mlflow.pyfunc.load_model(model_uri)
 
         logger.info("✅ Model successfully loaded.")

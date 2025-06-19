@@ -1,10 +1,19 @@
 # Databricks notebook source
-# MAGIC %pip install house_price-1.0.1-py3-none-any.whl
+# MAGIC %pip install -e ..
+# MAGIC %pip install git+https://github.com/end-to-end-mlops-databricks-3/marvelous@0.1.0
 
 # COMMAND ----------
+
 # MAGIC %restart_python
 
 # COMMAND ----------
+
+from pathlib import Path
+import sys
+sys.path.append(str(Path.cwd().parent / 'src'))
+
+# COMMAND ----------
+
 import os
 import time
 from typing import Dict, List
@@ -14,8 +23,8 @@ from loguru import logger
 from pyspark.dbutils import DBUtils
 from pyspark.sql import SparkSession
 
-from house_price.config import ProjectConfig
-from house_price.serving.fe_model_serving import FeatureLookupServing
+from tennis.config import ProjectConfig
+from tennis.serving.fe_model_serving import FeatureLookupServing
 
 # spark session
 
@@ -30,66 +39,45 @@ os.environ["DBR_HOST"] = spark.conf.get("spark.databricks.workspaceUrl")
 config = ProjectConfig.from_yaml(config_path="../project_config.yml")
 catalog_name = config.catalog_name
 schema_name = config.schema_name
-endpoint_name = "house-prices-model-serving-fe"
+endpoint_name = "tennis-model-serving-fe"
 
 # COMMAND ----------
+
 # Initialize Feature Lookup Serving Manager
 feature_model_server = FeatureLookupServing(
-    model_name=f"{catalog_name}.{schema_name}.house_prices_model_fe",
+    model_name=f"{catalog_name}.{schema_name}.tennis_model_fe",
     endpoint_name=endpoint_name,
-    feature_table_name=f"{catalog_name}.{schema_name}.house_features",
+    feature_table_name=f"{catalog_name}.{schema_name}.tennis_features",
 )
 
-# Create the online table for house features
+# Create the online table for tennis features
 feature_model_server.create_online_table()
 
 # COMMAND ----------
+
 # Deploy the model serving endpoint with feature lookup
 feature_model_server.deploy_or_update_serving_endpoint()
 
 
 # COMMAND ----------
+
 # Create a sample request body
-required_columns = [
-    "LotFrontage",
-    "LotArea",
-    "OverallCond",
-    "YearBuilt",
-    "YearRemodAdd",
-    "MasVnrArea",
-    "TotalBsmtSF",
-    "MSZoning",
-    "Street",
-    "Alley",
-    "LotShape",
-    "LandContour",
-    "Neighborhood",
-    "Condition1",
-    "BldgType",
-    "HouseStyle",
-    "RoofStyle",
-    "Exterior1st",
-    "Exterior2nd",
-    "MasVnrType",
-    "Foundation",
-    "Heating",
-    "CentralAir",
-    "SaleType",
-    "SaleCondition",
-    "Id",
-]
 
 spark = SparkSession.builder.getOrCreate()
 
-train_set = spark.table(f"{config.catalog_name}.{config.schema_name}.train_set").toPandas()
-sampled_records = train_set[required_columns].sample(n=1000, replace=True).to_dict(orient="records")
+test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set").toPandas()
+test_set = test_set.drop(["update_timestamp_utc", "RESULT", "AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF"], axis=1)
+
+# Sample 100 records from the training set
+sampled_records = test_set.sample(n=100, replace=True).to_dict(orient="records")
 dataframe_records = [[record] for record in sampled_records]
 
-logger.info(train_set.dtypes)
+logger.info(test_set.dtypes)
 logger.info(dataframe_records[0])
 
 
 # COMMAND ----------
+
 # Call the endpoint with one sample record
 def call_endpoint(record):
     """
@@ -110,6 +98,7 @@ print(f"Response Status: {status_code}")
 print(f"Response Text: {response_text}")
 
 # COMMAND ----------
+
 # Load test
 for i in range(len(dataframe_records)):
     status_code, response_text = call_endpoint(dataframe_records[i])

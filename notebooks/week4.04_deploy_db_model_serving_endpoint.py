@@ -1,4 +1,8 @@
 # Databricks notebook source
+# I leave this notebook untouched as I won't be deploying with database.
+
+# COMMAND ----------
+
 # MAGIC %pip install house_price-1.0.1-py3-none-any.whl
 
 # COMMAND ----------

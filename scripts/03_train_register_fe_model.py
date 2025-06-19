@@ -92,3 +92,8 @@ logger.info(predictions)
 # COMMAND ----------
 
 display(predictions)
+
+# COMMAND ----------
+
+run_id = "e7d80fae7ebf4c83a196973e2804eadf"
+mlflow.models.predict(f"runs:/{run_id}/xgboost-pipeline-model-fe", X_test[0:1])

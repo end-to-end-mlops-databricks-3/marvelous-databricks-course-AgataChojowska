@@ -1,9 +1,16 @@
 # Databricks notebook source
-# MAGIC %pip install house_price-1.0.1-py3-none-any.whl
+# MAGIC %pip install -e ..
+# MAGIC %pip install git+https://github.com/end-to-end-mlops-databricks-3/marvelous@0.1.0
 
 # COMMAND ----------
 
 # MAGIC %restart_python
+
+# COMMAND ----------
+
+from pathlib import Path
+import sys
+sys.path.append(str(Path.cwd().parent / 'src'))
 
 # COMMAND ----------
 
@@ -18,8 +25,8 @@ from databricks.sdk.service.serving import (
 from mlflow.models import infer_signature
 from pyspark.sql import SparkSession
 
-from house_price.config import ProjectConfig, Tags
-from house_price.models.basic_model import BasicModel
+from tennis.config import ProjectConfig, Tags
+from tennis.models.custom_model import TennisModel
 from marvelous.common import is_databricks
 from dotenv import load_dotenv
 import os
@@ -37,52 +44,73 @@ if not is_databricks():
 
 config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="prd")
 spark = SparkSession.builder.getOrCreate()
-tags = Tags(**{"git_sha": "abcd12345", "branch": "week4"})
+tags = Tags(**{"git_sha": "abcd12345", "branch": "week4", "job_run_id": "1"})
 
 # COMMAND ----------
+
 # Load project config
 config = ProjectConfig.from_yaml(config_path="../project_config.yml", env="dev")
 catalog_name = config.catalog_name
 schema_name = config.schema_name
 
+# Load test and train data
+from tennis.catalog_utils import load_from_table_to_pandas
+
+train_set = load_from_table_to_pandas(spark=spark, config=config, table="train_set").drop(
+        ["update_timestamp_utc"], axis=1
+    )
+test_set = load_from_table_to_pandas(spark=spark, config=config, table="test_set").drop(
+    ["update_timestamp_utc"], axis=1
+)
+
+
 # COMMAND ----------
+
 # train model A
-basic_model = BasicModel(config=config, tags=tags, spark=spark)
-basic_model.load_data()
+
+basic_model = TennisModel(config=config, tags=tags, spark=spark, train_set=train_set, test_set=test_set, model_name="tennis_model_A")
+
 basic_model.prepare_features()
 basic_model.train()
 basic_model.log_model()
 basic_model.register_model()
-model_A_uri = f"models:/{basic_model.model_name}@latest-model"
+model_A_uri = basic_model.model_uri
+print(model_A_uri)
 
 # COMMAND ----------
+
 # train model B
-basic_model_b = BasicModel(config=config, tags=tags, spark=spark)
-basic_model_b.paramaters = {"learning_rate": 0.01,
-                            "n_estimators": 1000,
-                            "max_depth": 6}
-basic_model_b.model_name = f"{catalog_name}.{schema_name}.house_prices_model_basic_B"
-basic_model_b.load_data()
+basic_model_b = TennisModel(config=config, tags=tags, spark=spark, train_set=train_set, test_set=test_set, model_name="tennis_model_B")
+basic_model_b.paramaters = {"colsample_bytree": 0.8,
+                            "learning_rate": 0.07,
+                            "max_depth": 7,
+                            "n_estimators": 200,
+                            "reg_alpha": 0.7,
+                            "reg_lambda": 0.7,
+                            "subsample": 0.9}
+model_name_b = f"{catalog_name}.{schema_name}.tennis_model_B"
 basic_model_b.prepare_features()
 basic_model_b.train()
 basic_model_b.log_model()
 basic_model_b.register_model()
-model_B_uri = f"models:/{basic_model_b.model_name}@latest-model"
+model_B_uri = basic_model_b.model_uri
+print(model_B_uri)
 
 # COMMAND ----------
+
 # define wrapper
 class HousePriceModelWrapper(mlflow.pyfunc.PythonModel):
     def load_context(self, context):
-        self.model_a = mlflow.sklearn.load_model(
-            context.artifacts["lightgbm-pipeline-model-A"]
+        self.model_a = mlflow.pyfunc.load_model(
+            context.artifacts["xgboost-pipeline-model-A"]
         )
-        self.model_b = mlflow.sklearn.load_model(
-            context.artifacts["lightgbm-pipeline-model-B"]
+        self.model_b = mlflow.pyfunc.load_model(
+            context.artifacts["xgboost-pipeline-model-B"]
         )
 
     def predict(self, context, model_input):
-        house_id = str(model_input["Id"].values[0])
-        hashed_id = hashlib.md5(house_id.encode(encoding="UTF-8")).hexdigest()
+        tennis_id = str(model_input["Id"].values[0])
+        hashed_id = hashlib.md5(tennis_id.encode(encoding="UTF-8")).hexdigest()
         # convert a hexadecimal (base-16) string into an integer
         if int(hashed_id, 16) % 2:
             predictions = self.model_a.predict(model_input.drop(["Id"], axis=1))
@@ -92,41 +120,66 @@ class HousePriceModelWrapper(mlflow.pyfunc.PythonModel):
             return {"Prediction": predictions[0], "model": "Model B"}
 
 # COMMAND ----------
+
+def load_context(self, context):
+        """Ensure tennis package is available during model loading"""
+        import subprocess
+        import sys
+        import os
+        
+        # Get the path to the wheel file
+        code_dir = os.path.join(os.path.dirname(context.artifacts.get("model", "")), "code")
+        wheel_path = os.path.join(code_dir, "tennis-0.1.0-py3-none-any.whl")
+        
+        if os.path.exists(wheel_path):
+            logger.info(f"Installing wheel from: {wheel_path}")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", wheel_path])
+            logger.info("Wheel installed successfully")
+        else:
+            logger.error(f"Wheel not found at: {wheel_path}")
+            logger.error(f"Available files in code dir: {os.listdir(code_dir) if os.path.exists(code_dir) else 'Directory not found'}")
+
+# COMMAND ----------
+
 train_set_spark = spark.table(f"{catalog_name}.{schema_name}.train_set")
 train_set = train_set_spark.toPandas()
 test_set = spark.table(f"{catalog_name}.{schema_name}.test_set").toPandas()
-X_train = train_set[config.num_features + config.cat_features + ["Id"]]
-X_test = test_set[config.num_features + config.cat_features + ["Id"]]
+X_train = train_set[config.features + ["Id"]]
+X_test = test_set[config.features + ["Id"]]
 
 # COMMAND ----------
-mlflow.set_experiment(experiment_name="/Shared/house-prices-ab-testing")
-model_name = f"{catalog_name}.{schema_name}.house_prices_model_pyfunc_ab_test"
+
+mlflow.set_experiment(experiment_name="/Shared/tennis-ab-testing")
+model_name = f"{catalog_name}.{schema_name}.tennis_model_pyfunc_ab_test"
 wrapped_model = HousePriceModelWrapper()
 
 with mlflow.start_run() as run:
     run_id = run.info.run_id
-    signature = infer_signature(model_input=X_train, model_output={"Prediction": 1234.5, "model": "Model B"})
+    signature = infer_signature(model_input=X_train, model_output={"probability1": 14.5, "probability2": 85.5, "model": "Model B"})
     dataset = mlflow.data.from_spark(train_set_spark, table_name=f"{catalog_name}.{schema_name}.train_set", version="0")
     mlflow.log_input(dataset, context="training")
     mlflow.pyfunc.log_model(
         python_model=wrapped_model,
-        artifact_path="pyfunc-house-price-model-ab",
+        artifact_path="pyfunc-tennis-model-ab",
         artifacts={
-            "lightgbm-pipeline-model-A": model_A_uri,
-            "lightgbm-pipeline-model-B": model_B_uri},
+            "xgboost-pipeline-model-A": model_A_uri,
+            "xgboost-pipeline-model-B": model_B_uri},
         signature=signature
     )
 model_version = mlflow.register_model(
-    model_uri=f"runs:/{run_id}/pyfunc-house-price-model-ab", name=model_name, tags=tags.dict()
+    model_uri=f"runs:/{run_id}/pyfunc-tennis-model-ab", name=model_name, tags=tags.dict()
 )
 
 # COMMAND ----------
+
 """Model serving module."""
 
 workspace = WorkspaceClient()
-model_name=f"{catalog_name}.{schema_name}.house_prices_model_custom_db"
-endpoint_name="house-prices-custom-model-serving-db"
+model_name=f"{catalog_name}.{schema_name}.tennis_model_pyfunc_ab_test"
+endpoint_name="tennis-custom-model-serving-ab"
 entity_version = model_version.version # registered model version
+
+endpoint_exists = any(item.name == endpoint_name for item in workspace.serving_endpoints.list())
 
 # get environment variables
 os.environ["DBR_TOKEN"] = dbutils.notebook.entry_point.getDbutils().notebook().getContext().apiToken().get()
@@ -141,53 +194,25 @@ served_entities = [
     )
 ]
 
-workspace.serving_endpoints.create(
+if not endpoint_exists:
+    workspace.serving_endpoints.create(
         name=endpoint_name,
         config=EndpointCoreConfigInput(
             served_entities=served_entities,
         ),
     )
+else:
+    workspace.serving_endpoints.update_config(name=endpoint_name, served_entities=served_entities)
 
 # COMMAND ----------
 
-# Create a sample request body
-required_columns = [
-    "LotFrontage",
-    "LotArea",
-    "OverallCond",
-    "YearBuilt",
-    "YearRemodAdd",
-    "MasVnrArea",
-    "TotalBsmtSF",
-    "MSZoning",
-    "Street",
-    "Alley",
-    "LotShape",
-    "LandContour",
-    "Neighborhood",
-    "Condition1",
-    "BldgType",
-    "HouseStyle",
-    "RoofStyle",
-    "Exterior1st",
-    "Exterior2nd",
-    "MasVnrType",
-    "Foundation",
-    "Heating",
-    "CentralAir",
-    "SaleType",
-    "SaleCondition",
-    "Id",
-]
-
-spark = SparkSession.builder.getOrCreate()
-
-train_set = spark.table(f"{catalog_name}.{schema_name}.train_set").toPandas()
-sampled_records = train_set[required_columns].sample(n=1000, replace=True).to_dict(orient="records")
+# Sample 1000 records from the test set
+test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set").toPandas()
+test_set = test_set.drop(["update_timestamp_utc", "RESULT"], axis=1)
+sampled_records = test_set.sample(n=1000, replace=True).to_dict(orient="records")
 dataframe_records = [[record] for record in sampled_records]
-
-print(train_set.dtypes)
 print(dataframe_records[0])
+
 
 # COMMAND ----------
 
@@ -215,7 +240,7 @@ def call_endpoint(record):
     """
     Calls the model serving endpoint with a given input record.
     """
-    serving_endpoint = f"https://{os.environ['DBR_HOST']}/serving-endpoints/house-prices-custom-model-serving-db/invocations"
+    serving_endpoint = f"https://{os.environ['DBR_HOST']}/serving-endpoints/tennis-custom-model-serving-ab/invocations"
 
     response = requests.post(
         serving_endpoint,
