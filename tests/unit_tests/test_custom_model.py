@@ -131,7 +131,9 @@ def test_register_model(mock_custom_model: TennisModel) -> None:
     mock_custom_model.register_model()
 
     client = MlflowClient()
-    model_name = f"{mock_custom_model.config.catalog_name}.{mock_custom_model.config.schema_name}.pyfunc-tennis-model"
+    model_name = (
+        f"{mock_custom_model.config.catalog_name}.{mock_custom_model.config.schema_name}.{mock_custom_model.model_name}"
+    )
 
     try:
         model = client.get_registered_model(model_name)
