@@ -121,31 +121,35 @@ class HousePriceModelWrapper(mlflow.pyfunc.PythonModel):
 
 # COMMAND ----------
 
-def load_context(self, context):
-        """Ensure tennis package is available during model loading"""
-        import subprocess
-        import sys
-        import os
-        
-        # Get the path to the wheel file
-        code_dir = os.path.join(os.path.dirname(context.artifacts.get("model", "")), "code")
-        wheel_path = os.path.join(code_dir, "tennis-0.1.0-py3-none-any.whl")
-        
-        if os.path.exists(wheel_path):
-            logger.info(f"Installing wheel from: {wheel_path}")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", wheel_path])
-            logger.info("Wheel installed successfully")
-        else:
-            logger.error(f"Wheel not found at: {wheel_path}")
-            logger.error(f"Available files in code dir: {os.listdir(code_dir) if os.path.exists(code_dir) else 'Directory not found'}")
-
-# COMMAND ----------
-
 train_set_spark = spark.table(f"{catalog_name}.{schema_name}.train_set")
 train_set = train_set_spark.toPandas()
 test_set = spark.table(f"{catalog_name}.{schema_name}.test_set").toPandas()
 X_train = train_set[config.features + ["Id"]]
 X_test = test_set[config.features + ["Id"]]
+
+# COMMAND ----------
+
+conda_env = {
+    "name": "mlflow-env",
+    "channels": ["conda-forge"],
+    "dependencies": [
+        "python=3.11.11",
+        "pip<=23.2.1",
+        {
+            "pip": [
+                "mlflow==2.17.0",
+                "cloudpickle==3.1.0",
+                "ipython==8.15.0",
+                "numpy==1.26.4", 
+                "pandas==2.2.3",
+                "pyspark==3.5.0",
+                "scikit-learn==1.5.2",
+                "scipy==1.14.1",
+                "./code/tennisprediction-0.0.1-py3-none-any.whl"
+            ]
+        }
+    ]
+}
 
 # COMMAND ----------
 
@@ -164,7 +168,9 @@ with mlflow.start_run() as run:
         artifacts={
             "xgboost-pipeline-model-A": model_A_uri,
             "xgboost-pipeline-model-B": model_B_uri},
-        signature=signature
+        signature=signature,
+        conda_env=conda_env,
+        code_paths=["../dist/tennisprediction-0.0.1-py3-none-any.whl"]
     )
 model_version = mlflow.register_model(
     model_uri=f"runs:/{run_id}/pyfunc-tennis-model-ab", name=model_name, tags=tags.dict()
