@@ -1,4 +1,4 @@
-exclude: ^tests/resources/
+exclude: ^(tests/resources/|notebooks|scripts/03_train_register_fe_model.py)
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
@@ -11,7 +11,9 @@ repos:
       - id: check-yaml
         args: ["--unsafe"]
       - id: end-of-file-fixer
+        stages: [commit]
       - id: trailing-whitespace
+        stages: [commit]
       - id: detect-private-key
       - id: forbid-new-submodules
       - id: check-docstring-first
