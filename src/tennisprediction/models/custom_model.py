@@ -78,6 +78,7 @@ class TennisModel:
         test_set: pd.DataFrame,
         model_name: Optional[str],
         code_paths: Optional[list] = None,
+        additional_pip_deps: Optional[list] = None,
     ) -> None:
         self.config = config
         self.spark = spark
@@ -89,6 +90,7 @@ class TennisModel:
         self.X_test = test_set[config.features]
         self.y_test = test_set[config.target_name]
         self.parameters = self.config.parameters
+        self.additional_pip_deps = additional_pip_deps
         self.model_name = model_name or "pyfunc-tennis-model"
 
     def prepare_features(self) -> None:
@@ -149,13 +151,12 @@ class TennisModel:
 
             mlflow.log_input(dataset, context="training")
 
-            additional_pip_deps = ["./code/tennisprediction-0.0.1-py3-none-any.whl"]
-            conda_env = _mlflow_conda_env(additional_pip_deps=additional_pip_deps)
+            conda_env = _mlflow_conda_env(additional_pip_deps=self.additional_pip_deps)
 
             mlflow.pyfunc.log_model(
                 python_model=TennisModelWrapper(self.pipeline),
                 artifact_path=self.model_name,
-                code_paths=["../dist/tennisprediction-0.0.1-py3-none-any.whl"],
+                code_paths=self.code_paths,
                 conda_env=conda_env,
                 signature=signature,
                 input_example=self.X_train.iloc[0:1],
