@@ -54,6 +54,12 @@ def test_set() -> pd.DataFrame:
     return X_test
 
 
+@pytest.fixture(scope="function")
+def model_name() -> str:
+    """Create a sample model name."""
+    return "my_test_model"
+
+
 @pytest.fixture(scope="session", autouse=True)
 def create_mlruns_directory() -> None:
     """Create or recreate the MLFlow tracking directory.
