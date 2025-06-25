@@ -1,27 +1,30 @@
 """Tennis match data processing pipeline."""
 
 import yaml
+from loguru import logger
+from marvelous.common import create_parser
 from marvelous.timer import Timer
 
 from tennisprediction.catalog_utils import load_csv, save_to_catalog
 from tennisprediction.config import ProjectConfig
 from tennisprediction.data_processor import DataProcessor, split_data
-from tennisprediction.runtime_utils import get_spark, setup_project_logging
+from tennisprediction.runtime_utils import get_spark
 from tennisprediction.stats_calculator import StatsCalculator
 
 
 def main() -> None:
     """Execute the data processing pipeline."""
+    args = create_parser()
     config_path = "project_config.yml"
 
     # Load configuration
-    config = ProjectConfig.from_yaml(config_path=config_path, env="dev")
+    root_path = args.root_path
+    config_path = f"{root_path}/files/project_config.yml"
+    config = ProjectConfig.from_yaml(config_path=config_path, env=args.env)
+    is_test = args.is_test
 
-    # Set up logger with configuration
-    setup_project_logging(config)
-
-    print("Configuration loaded:")
-    print(yaml.dump(config, default_flow_style=False))
+    logger.info("Configuration loaded:")
+    logger.info(yaml.dump(config, default_flow_style=False))
 
     # Get SparkSession or Databricks session based on your current runtime.
     spark = get_spark()
