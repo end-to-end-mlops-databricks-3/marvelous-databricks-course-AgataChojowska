@@ -4,7 +4,7 @@ import time
 
 import mlflow
 from databricks.sdk import WorkspaceClient
-from databricks.sdk.service import catalog
+from databricks.sdk.errors import NotFound
 from databricks.sdk.service.catalog import (
     OnlineTableSpec,
     OnlineTableSpecTriggeredSchedulingPolicy,
@@ -142,7 +142,7 @@ class FeatureLookupServing:
                 else:
                     logger.info(f"Pipeline is in {state} state.")
                 time.sleep(30)
-        except catalog.NotFound:
+        except NotFound:
             spec = OnlineTableSpec(
                 primary_key_columns=["Id"],
                 source_table_full_name=self.feature_table_name,
