@@ -20,6 +20,7 @@ lint.ignore = [
     "C901", # too complex
     "F841", # I need data_version=1 for now
     "C416", # List comprehensions I want to keep
+    "ERA001", # Commented out code
 ]
 
 [format]
