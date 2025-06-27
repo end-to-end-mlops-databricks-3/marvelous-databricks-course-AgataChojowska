@@ -29,9 +29,9 @@ endpoint_name = f"tennis-from-bundle-serving-fe-{args.env}"
 
 # Initialize Feature Lookup Serving Manager
 feature_model_server = FeatureLookupServing(
-    model_name=f"{catalog_name}.{schema_name}.house_prices_model_fe",
+    model_name=f"{catalog_name}.{schema_name}.tennis_model_fe",
     endpoint_name=endpoint_name,
-    feature_table_name=f"{catalog_name}.{schema_name}.tennis_preds",
+    feature_table_name=f"{catalog_name}.{schema_name}.tennis_features",
 )
 
 # Create or update the online table for house features
