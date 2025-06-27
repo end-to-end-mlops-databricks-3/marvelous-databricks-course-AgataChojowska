@@ -31,7 +31,7 @@ endpoint_name = f"tennis-from-bundle-serving-fe-{args.env}"
 feature_model_server = FeatureLookupServing(
     model_name=f"{catalog_name}.{schema_name}.house_prices_model_fe",
     endpoint_name=endpoint_name,
-    feature_table_name=f"{catalog_name}.{schema_name}.house_features",
+    feature_table_name=f"{catalog_name}.{schema_name}.tennis_preds",
 )
 
 # Create or update the online table for house features
