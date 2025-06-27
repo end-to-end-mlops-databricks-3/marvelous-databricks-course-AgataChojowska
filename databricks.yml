@@ -27,7 +27,7 @@ variables:
     default: 0
   env:
     description: environment
-    default: dev
+    default: prd
   marvelous_version:
     description: version of Marvelous package
     default: "0.3.1"
