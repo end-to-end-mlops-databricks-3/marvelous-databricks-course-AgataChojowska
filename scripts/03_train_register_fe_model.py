@@ -1,99 +1,72 @@
-# Databricks notebook source
-# MAGIC %pip install -e ..
-# MAGIC %pip install git+https://github.com/end-to-end-mlops-databricks-3/marvelous@0.1.0
-
-# COMMAND ----------
-
-# MAGIC %restart_python
-
-# COMMAND ----------
-
-from pathlib import Path
-import sys
-sys.path.append(str(Path.cwd().parent / 'src'))
-
-# COMMAND ----------
-
-# Configure tracking uri
 from loguru import logger
 from pyspark.sql import SparkSession
+from marvelous.common import create_parser
+from pyspark.dbutils import DBUtils
 
 from tennisprediction.config import ProjectConfig, Tags
 from tennisprediction.models.feature_lookup_model import FeatureLookUpModel
 
-# Configure tracking uri
-# mlflow.set_tracking_uri("databricks")
-# mlflow.set_registry_uri("databricks-uc")
+args = create_parser()
 
+root_path = args.root_path
+config_path = f"{root_path}/files/project_config.yml"
+
+config = ProjectConfig.from_yaml(config_path=config_path, env=args.env)
 spark = SparkSession.builder.getOrCreate()
-tags_dict = {"git_sha": "abcd12345", "branch": "week3", "job_run_id": "123"}
+dbutils = DBUtils(spark)
+tags_dict = {"git_sha": args.git_sha, "branch": args.branch, "job_run_id": args.job_run_id}
 tags = Tags(**tags_dict)
 
-config = ProjectConfig.from_yaml(config_path="../project_config.yml")
 
-
-# COMMAND ----------
 
 # Initialize model
+spark = SparkSession.builder.getOrCreate()
 fe_model = FeatureLookUpModel(config=config, tags=tags, spark=spark)
+logger.info("Model initialized.")
 
-# COMMAND ----------
 
 # Create feature table
-fe_model.create_feature_table()
+# fe_model.create_feature_table()
 
-# COMMAND ----------
+# Update feature table
+fe_model.update_feature_table()
+logger.info("Feature table updated.")
+
 
 # Define house age feature function
-fe_model.define_feature_function()
+# fe_model.define_feature_function()
 
-# COMMAND ----------
 
 # Load data
 fe_model.load_data()
+logger.info("Loaded the data")
 
-# COMMAND ----------
 
 # Perform feature engineering
 fe_model.feature_engineering()
-
-# COMMAND ----------
+logger.info("Done with Feature Engineering.")
 
 # Train the model
 fe_model.train()
+logger.info("Model training completed.")
 
-# COMMAND ----------
+# Model evaluation could be done here
 
 # Register the model
 fe_model.register_model()
 
-# COMMAND ----------
+is_test = args.is_test
 
-# Lets run prediction on the last production model
-# Load test set from Delta table
-spark = SparkSession.builder.getOrCreate()
-
-test_set = spark.table(f"{config.catalog_name}.{config.schema_name}.test_set").limit(10)
-
-# Drop feature lookup columns and target
-X_test = test_set.drop("AGE_DIFF", "DRAW_SIZE", "ATP_POINTS_DIFF", config.target_name)
+# when running test, always register and deploy (or always as I don't have eval)
+model_improved = True
 
 
-# COMMAND ----------
+if model_improved:
+    # Register the model
+    latest_version = fe_model.register_model()
+    logger.info("New model registered with version:", latest_version)
+    dbutils.jobs.taskValues.set(key="model_version", value=latest_version)
+    dbutils.jobs.taskValues.set(key="model_updated", value=1)
 
-fe_model = FeatureLookUpModel(config=config, tags=tags, spark=spark)
-
-# Make predictions
-predictions = fe_model.load_latest_model_and_predict(X_test)
-
-# Display predictions
-logger.info(predictions)
-
-# COMMAND ----------
-
-display(predictions)
-
-# COMMAND ----------
-
-run_id = "e7d80fae7ebf4c83a196973e2804eadf"
-mlflow.models.predict(f"runs:/{run_id}/xgboost-pipeline-model-fe", X_test[0:1])
+else:
+    dbutils.jobs.taskValues.set(key="model_updated", value=0)

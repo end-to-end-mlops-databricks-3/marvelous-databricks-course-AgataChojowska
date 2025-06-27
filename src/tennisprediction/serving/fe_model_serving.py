@@ -4,6 +4,7 @@ import time
 
 import mlflow
 from databricks.sdk import WorkspaceClient
+from databricks.sdk.service import catalog
 from databricks.sdk.service.catalog import (
     OnlineTableSpec,
     OnlineTableSpecTriggeredSchedulingPolicy,
@@ -51,10 +52,7 @@ class FeatureLookupServing:
         return latest_version
 
     def deploy_or_update_serving_endpoint(
-        self,
-        version: str = "latest",
-        workload_size: str = "Small",
-        scale_to_zero: bool = True,
+        self, version: str = "latest", workload_size: str = "Small", scale_to_zero: bool = True, wait: bool = False
     ) -> None:
         """Deploy or update the model serving endpoint in Databricks.
 
@@ -82,10 +80,16 @@ class FeatureLookupServing:
                 ),
             )
         else:
-            self.workspace.serving_endpoints.update_config(  # update_config_and_wait
-                name=self.endpoint_name,
-                served_entities=served_entities,
-            )
+            if wait:
+                self.workspace.serving_endpoints.update_config_and_wait(
+                    name=self.endpoint_name,
+                    served_entities=served_entities,
+                )
+            else:
+                self.workspace.serving_endpoints.update_config(
+                    name=self.endpoint_name,
+                    served_entities=served_entities,
+                )
 
     def update_online_table(self, config: ProjectConfig) -> None:
         """Trigger a Databricks pipeline update and monitor its state.
@@ -113,3 +117,37 @@ class FeatureLookupServing:
                 logger.info(f"Pipeline is in {state} state.")
 
             time.sleep(30)
+
+    def create_or_update_online_table(self) -> None:
+        """Create or update an online table for house features."""
+        try:
+            existing_table = self.workspace.online_tables.get(self.online_table_name)
+            logger.info("Online table already exists. Inititating table update.")
+            pipeline_id = existing_table.spec.pipeline_id
+            update_response = self.workspace.pipelines.start_update(pipeline_id=pipeline_id, full_refresh=False)
+            while True:
+                update_info = self.workspace.pipelines.get_update(
+                    pipeline_id=pipeline_id, update_id=update_response.update_id
+                )
+                state = update_info.update.state.value
+
+                if state == "COMPLETED":
+                    logger.info("Pipeline update completed successfully.")
+                    break
+                elif state in ["FAILED", "CANCELED"]:
+                    logger.error("Pipeline update failed.")
+                    raise SystemError("Online table failed to update.")
+                elif state == "WAITING_FOR_RESOURCES":
+                    logger.warning("Pipeline is waiting for resources.")
+                else:
+                    logger.info(f"Pipeline is in {state} state.")
+                time.sleep(30)
+        except catalog.NotFound:
+            spec = OnlineTableSpec(
+                primary_key_columns=["Id"],
+                source_table_full_name=self.feature_table_name,
+                run_triggered=OnlineTableSpecTriggeredSchedulingPolicy.from_dict({"triggered": "true"}),
+                perform_full_copy=False,
+            )
+            self.workspace.online_tables.create(name=self.online_table_name, spec=spec)
+            logger.info("Online does not exists. Inititating table creation.")

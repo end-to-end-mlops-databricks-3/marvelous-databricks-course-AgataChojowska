@@ -34,7 +34,7 @@ variables:
 
 resources:
   jobs:
-    deployment:
+    tennis-deployment:
       name: ${bundle.name}-workflow
       # email_notifications:
       #     on_failure:
@@ -97,60 +97,60 @@ resources:
           libraries:
             - whl: ./dist/*.whl
             - whl: /Volumes/mlops_prd/utils/package/marvelous-${var.marvelous_version}-py3-none-any.whl
-        # - task_key: model_updated
-        #   condition_task:
-        #     op: "EQUAL_TO"
-        #     left: "{{tasks.train_model.values.model_updated}}"
-        #     right: "1"
-        #   depends_on:
-        #     - task_key: "train_model"
-        # - task_key: "deploy_model"
-        #   depends_on:
-        #     - task_key: "model_updated"
-        #       outcome: "true"
-        #   job_cluster_key: "tennis-preds-cluster"
-        #   spark_python_task:
-        #     python_file: "scripts/03_deploy_model.py"
-        #     parameters:
-        #       - "deployment"
-        #       - "--root_path"
-        #       - "${workspace.root_path}"
-        #       - "--env"
-        #       - "${var.env}"
-        #       - "--is_test"
-        #       - "${var.is_test}"
-        #   libraries:
-        #     - whl: ./dist/*.whl
-        #     - whl: /Volumes/mlops_prd/utils/package/marvelous-${var.marvelous_version}-py3-none-any.whl
-        # - task_key: post_commit_status_required
-        #   condition_task:
-        #     op: "EQUAL_TO"
-        #     left: "${var.is_test}"
-        #     right: "1"
-        #   depends_on:
-        #     - task_key: "deploy_model"
-        # - task_key: "post_commit_status"
-        #   depends_on:
-        #     - task_key: "post_commit_status_required"
-        #       outcome: "true"
-        #   job_cluster_key: "tennis-preds-cluster"
-        #   spark_python_task:
-        #     python_file: "scripts/04_post_commit_status.py"
-        #     parameters:
-        #       - "post_commit_check"
-        #       - "--job_run_id"
-        #       - "{{job.run_id}}"
-        #       - "--job_id"
-        #       - "{{job.id}}"
-        #       - "--git_sha"
-        #       - "${var.git_sha}"
-        #       - "--repo"
-        #       - "${var.repo}"
-        #       - "--org"
-        #       - "${var.org}"
-        #   libraries:
-        #     - whl: ./dist/*.whl
-        #     - whl: /Volumes/mlops_prd/utils/package/marvelous-${var.marvelous_version}-py3-none-any.whl
+        - task_key: model_updated
+          condition_task:
+            op: "EQUAL_TO"
+            left: "{{tasks.train_model.values.model_updated}}"
+            right: "1"
+          depends_on:
+            - task_key: "train_model"
+        - task_key: "deploy_model"
+          depends_on:
+            - task_key: "model_updated"
+              outcome: "true"
+          job_cluster_key: "tennis-preds-cluster"
+          spark_python_task:
+            python_file: "scripts/04_deploy_model.py"
+            parameters:
+              - "deployment"
+              - "--root_path"
+              - "${workspace.root_path}"
+              - "--env"
+              - "${var.env}"
+              - "--is_test"
+              - "${var.is_test}"
+          libraries:
+            - whl: ./dist/*.whl
+            - whl: /Volumes/mlops_prd/utils/package/marvelous-${var.marvelous_version}-py3-none-any.whl
+        - task_key: post_commit_status_required
+          condition_task:
+            op: "EQUAL_TO"
+            left: "${var.is_test}"
+            right: "1"
+          depends_on:
+            - task_key: "deploy_model"
+        - task_key: "post_commit_status"
+          depends_on:
+            - task_key: "post_commit_status_required"
+              outcome: "true"
+          job_cluster_key: "tennis-preds-cluster"
+          spark_python_task:
+            python_file: "scripts/05_post_commit_status.py"
+            parameters:
+              - "post_commit_check"
+              - "--job_run_id"
+              - "{{job.run_id}}"
+              - "--job_id"
+              - "{{job.id}}"
+              - "--git_sha"
+              - "${var.git_sha}"
+              - "--repo"
+              - "${var.repo}"
+              - "--org"
+              - "${var.org}"
+          libraries:
+            - whl: ./dist/*.whl
+            - whl: /Volumes/mlops_prd/utils/package/marvelous-${var.marvelous_version}-py3-none-any.whl
 
 targets:
   dev:
